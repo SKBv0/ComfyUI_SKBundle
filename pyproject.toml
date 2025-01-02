@@ -10,6 +10,6 @@ Repository = "https://github.com/SKBv0/ComfyUI_SKBundle"
 #  Used by Comfy Registry https://comfyregistry.org
 
 [tool.comfy]
-PublisherId = ""
+PublisherId = "skb"
 DisplayName = "ComfyUI_SKBundle"
 Icon = ""
