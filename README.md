@@ -2,6 +2,13 @@
 
 A collection of custom nodes designed to enhance your workflow in ComfyUI. These nodes were developed to meet my own needs while working with ComfyUI. Although I'm not a programmer, I created these nodes with the help of Cursor AI and will continue to develop them over time.
 ![skb (16)](https://github.com/user-attachments/assets/63e37dcd-18f2-46c8-94ab-0c5a986ae868)
+### New: 📸 Lens Flare Node
+- **Lens Flare**: Adds realistic lens flare effects to images. You can customise settings such as flare type, size, rotation and intensity.
+
+<div style="display: flex; justify-content: space-between;">
+  <img src="https://github.com/user-attachments/assets/444f8a80-767f-4fd8-a52c-9cef8888b2c5" alt="Lens Flare Node" style="width: 45%; height: auto;">
+  <img src="https://github.com/user-attachments/assets/5daaf6eb-6ae9-4c3a-9f05-4856029b2a74" alt="Lens Flare Settings" style="width: 45%; height: auto;">
+</div>
 
 ### 📝 Text Nodes
 - **MultiText**: Advanced text editing capabilities
