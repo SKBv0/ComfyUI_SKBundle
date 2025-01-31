@@ -845,9 +845,8 @@ const MultiTextNode = {
                 font-family: ${THEME.typography.fonts.primary};
                 width: 320px;
                 transition: all 0.2s;
-                left: 50%;
-                top: 50%;
-                transform: translate(-50%, -50%);
+                max-height: 80vh;
+                overflow-y: auto;
             `;
 
             const content = document.createDocumentFragment();
@@ -1390,14 +1389,33 @@ const MultiTextNode = {
 
             dialog.appendChild(content);
             document.body.appendChild(dialog);
-            const rect = dialog.getBoundingClientRect();
-            dialog.style.left = `${(window.innerWidth - rect.width) / 2}px`;
-            dialog.style.top = `${(window.innerHeight - rect.height) / 2}px`;
+
+            const container = document.querySelector('.graph-canvas-container');
+            const containerRect = container.getBoundingClientRect();
+
+            const dialogRect = dialog.getBoundingClientRect();
+
+            let desiredLeft = (window.innerWidth - dialogRect.width) / 2;
+            let desiredTop = (window.innerHeight - dialogRect.height) / 2;
+
+            const clampedLeft = Math.max(
+                containerRect.left,
+                Math.min(containerRect.right - dialogRect.width, desiredLeft)
+            );
+
+            const clampedTop = Math.max(
+                containerRect.top,
+                Math.min(containerRect.bottom - dialogRect.height, desiredTop)
+            );
+
+            dialog.style.left = clampedLeft + 'px';
+            dialog.style.top = clampedTop + 'px';
+            dialog.style.transform = 'none';
 
             textarea.focus();
 
         } catch (error) {
-            console.error('Dialog oluşturma hatası:', error);
+            console.error('Dialog creation error:', error);
         }
     },
 
