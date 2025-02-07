@@ -419,7 +419,9 @@ const Renderer = {
         ctx.fillStyle = THEME.colors.text;
         ctx.font = `400 13px ${THEME.typography.fonts.primary}`;
         const truncatedText = Utils.truncateTextEfficient(ctx, text, rowWidth - 100);
-        ctx.fillText(truncatedText, x + 10, y + rowHeight/2 + 4);
+        // in Renderer.drawPromptRow or similar:
+        const toggleWidth = 30;  // or whatever the checkbox+margin is
+        ctx.fillText(truncatedText, x + toggleWidth + 10, y + rowHeight/2 + 4);
 
         const weightX = x + rowWidth - 90;
         const weightY = y + rowHeight/2;
@@ -518,8 +520,13 @@ const MultiTextNode = {
         
         const savedPromptCount = localStorage.getItem('multitext_prompt_count');
         this.activePrompts = savedPromptCount ? parseInt(savedPromptCount) : 2;
-        this.maxPrompts = 8;
-        
+        this.maxPrompts = 20;
+
+            // **NEW: Load Single/Multi mode from storage**
+        const savedMode = localStorage.getItem('multitext_single_prompt');
+        this.isSinglePromptMode = savedMode === "true";  // Convert from string to boolean
+
+        this.applyPromptMode(); // Apply correct mode on startup 
         this.updateNodeSize();
         
         this.hoverStates = new Map();
@@ -534,7 +541,7 @@ const MultiTextNode = {
 
         this.currentHoverIndex = -1;
 
-        this.visualWidgets = Array(8).fill(null).map((_, i) => ({
+        this.visualWidgets = Array(20).fill(null).map((_, i) => ({
             index: i,
             isHovered: false
         }));
@@ -542,7 +549,7 @@ const MultiTextNode = {
         this.loadFonts();
     },
     setupWidgets() {
-        for (let i = 1; i <= 8; i++) {
+        for (let i = 1; i <= 20; i++) {
             const textWidget = ComfyWidgets["STRING"](this, `text${i}`, ["STRING", { 
                 multiline: true,
                 visible: false
@@ -555,6 +562,23 @@ const MultiTextNode = {
                 visible: false
             }], app);
 
+             // NEW: label{i} widget
+            const labelWidget = ComfyWidgets["STRING"](
+                this,
+                `label${i}`,
+                ["STRING", { multiline: false, visible: false }],
+                app
+            );
+
+              // NEW: enabled{i} widget
+            const enabledWidget = ComfyWidgets["BOOLEAN"](
+                this,
+                `enabled${i}`, // name it uniquely
+                ["BOOLEAN", { default: true, visible: false }],
+                app
+            );
+            
+
             if (textWidget?.widget) {
                 textWidget.widget.computeSize = () => [0, -4];
                 textWidget.widget.hidden = true;
@@ -563,6 +587,14 @@ const MultiTextNode = {
                 weightWidget.widget.computeSize = () => [0, -4];
                 weightWidget.widget.hidden = true;
             }
+            if (labelWidget?.widget) {
+                labelWidget.widget.computeSize = () => [0, -4];
+                labelWidget.widget.hidden = true;
+            }
+            if (enabledWidget?.widget) {
+                enabledWidget.widget.computeSize = () => [0, -4];
+                enabledWidget.widget.hidden = true; // so it doesn't appear by default
+              }
         }
 
         const separator = ComfyWidgets["STRING"](this, "separator", ["STRING", { 
@@ -591,13 +623,23 @@ const MultiTextNode = {
 
     setupVisualWidgets() {
         this.visualWidgets = [];
-        for (let i = 1; i <= 8; i++) {
+        for (let i = 1; i <= 20; i++) {
             this.visualWidgets.push({
                 index: i,
                 isHovered: false
             });
         }
     },
+    applyPromptMode() {
+        if (this.isSinglePromptMode) {
+            // **Disable all rows except the first**
+            for (let i = 1; i < this.activePrompts; i++) {
+                const enabledWidget = this.widgets.find(w => w.name === `enabled${i+1}`);
+                if (enabledWidget) enabledWidget.value = false;
+            }
+        }
+        this.setDirtyCanvas(true);
+    },    
 
     onMouseDown(event, pos, ctx) {
         if (event.button === 0) {
@@ -608,6 +650,13 @@ const MultiTextNode = {
                 return true;
             } else if (controls.remove) {
                 this.removePrompt();
+                return true;
+            } else if (controls.toggle) { // Handle toggle switch click
+                this.isSinglePromptMode = !this.isSinglePromptMode;
+                localStorage.setItem('multitext_single_prompt', this.isSinglePromptMode); // **Save state**
+                this.applyPromptMode(); // Apply the new mode
+                this.setDirtyCanvas(true);
+                return true;
                 return true;
             } else if (controls.separator) {
                 const separatorMenu = document.createElement('div');
@@ -815,42 +864,87 @@ const MultiTextNode = {
 
                 return true;
             }
-
-            const index = this.getHoveredWidgetIndex(pos);
-            if (index !== -1 && index < this.activePrompts) {
-                this.showEditDialog(index + 1);
-                return true;
+            
+                  // check if user clicked a row
+                  const index = this.getHoveredWidgetIndex(pos);
+                  if (index !== -1 && index < this.activePrompts) {
+                    if (this.isInsideToggle(pos, index)) {
+                        this.togglePromptRow(index);
+                        return true;
+                    }            
+                    this.showEditDialog(index + 1);
+                }
             }
-        }
-        return false;
-    },
+            return false;              
+          },
+
+          isInsideToggle(pos, rowIndex) {
+            const margin = STYLES.row.padding;
+            const rowHeight = STYLES.row.height;
+            const rowMargin = STYLES.row.margin;
+        
+            const y = margin + rowIndex * (rowHeight + rowMargin);
+            const toggleWidth = 30;
+            const toggleHeight = 14;
+            const togglePadding = 6;  // Extra padding to reduce accidental blocking
+        
+            // Adjusted toggle positioning
+            const x1 = margin + togglePadding;
+            const y1 = y + rowHeight / 2 - toggleHeight / 2;
+        
+            return (
+                pos[0] >= x1 &&
+                pos[0] <= x1 + toggleWidth &&
+                pos[1] >= y1 &&
+                pos[1] <= y1 + toggleHeight
+            );
+        },
+
+        togglePromptRow(index) {
+            const enabledWidget = this.widgets.find(w => w.name === `enabled${index+1}`);
+        
+            if (this.isSinglePromptMode) {
+                // **Disable all other rows, enable only the clicked row**
+                for (let i = 0; i < this.activePrompts; i++) {
+                    const widget = this.widgets.find(w => w.name === `enabled${i+1}`);
+                    if (widget) widget.value = (i === index); // Enable only the clicked one
+                }
+            } else {
+                // **Multi mode: Allow toggling freely**
+                if (enabledWidget) {
+                    enabledWidget.value = !enabledWidget.value;
+                }
+            }
+        
+            this.setDirtyCanvas(true);
+        },        
 
     showEditDialog(index) {
         try {
             const textWidget = this.widgets.find(w => w.name === `text${index}`);
             const weightWidget = this.widgets.find(w => w.name === `weight${index}`);
-            
-            if (!textWidget || !weightWidget) return;
+            const labelWidget  = this.widgets.find(w => w.name === `label${index}`);
+            if (!textWidget || !weightWidget || !labelWidget) return;
 
             const dialog = document.createElement('div');
             dialog.style.cssText = `
-                position: fixed;
-                z-index: 10000;
-                background: ${THEME.colors.bg};
-                padding: ${THEME.sizes.spacing.lg}px;
-                border-radius: ${THEME.sizes.borderRadius * 2}px;
-                border: 1px solid ${THEME.colors.border};
-                box-shadow: 0 8px 32px rgba(0,0,0,0.4);
-                color: ${THEME.colors.text};
-                font-family: ${THEME.typography.fonts.primary};
-                width: 320px;
-                transition: all 0.2s;
-                max-height: 80vh;
-                overflow-y: auto;
-            `;
+            position: fixed;
+            z-index: 10000;
+            background: ${THEME.colors.bg};
+            padding: ${THEME.sizes.spacing.lg}px;
+            border-radius: ${THEME.sizes.borderRadius * 2}px;
+            border: 1px solid ${THEME.colors.border};
+            box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+            color: ${THEME.colors.text};
+            font-family: ${THEME.typography.fonts.primary};
+            width: 320px;
+            transition: all 0.2s;
+            /* ADDED: a max-height  */
+            max-height: 80vh;       /* 80% of viewport height */s
+        `;
 
             const content = document.createDocumentFragment();
-
+            
             const header = document.createElement('div');
             header.style.cssText = `
                 display: flex;
@@ -878,7 +972,7 @@ const MultiTextNode = {
             document.addEventListener('mouseup', dragEnd);
 
             function dragStart(e) {
-                if (e.target === header) {
+                if (e.target === header || e.target === title) {
                     isDragging = true;
                     dialog.style.transition = 'none';
                     header.style.cursor = 'grabbing';
@@ -906,15 +1000,60 @@ const MultiTextNode = {
                 isDragging = false;
                 header.style.cursor = 'move';
             }
+            
 
+            // Title (Left-aligned)
             const title = document.createElement('div');
             title.textContent = `Prompt ${index}`;
             title.style.cssText = `
                 font-size: ${THEME.sizes.fontSize.title}px;
                 font-weight: ${THEME.typography.weights.semibold};
                 color: ${THEME.colors.text};
+                flex-grow: 1; /* Allows it to take up available space */
             `;
 
+            // Right-side button container (Save + Close)
+            const buttonContainer = document.createElement('div');
+            buttonContainer.style.cssText = `
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                margin-left: auto; /* Pushes it to the right */
+            `;
+
+            // Save Button
+            const saveButton = document.createElement('button');
+            saveButton.textContent = 'Save';
+            saveButton.style.cssText = `
+                max-width: 100px;
+                padding: 8px 16px;
+                background: ${THEME.colors.accent};
+                border: none;
+                border-radius: 8px;
+                color: white;
+                font-size: 14px;
+                font-weight: 600;
+                cursor: pointer;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                transition: background 0.2s;
+
+                &:hover {
+                    background: ${THEME.colors.accentLight};
+                }
+            `;
+
+            saveButton.onclick = () => {
+                labelWidget.value = labelInput.value;
+                textWidget.value = textarea.value;
+                weightWidget.value = parseFloat(weightInput.value);
+                this.saveToHistory(textarea.value);
+                dialog.remove();
+                this.setDirtyCanvas(true);
+            };
+
+            // Close Button (X)
             const closeBtn = document.createElement('button');
             closeBtn.innerHTML = '×';
             closeBtn.style.cssText = `
@@ -930,13 +1069,90 @@ const MultiTextNode = {
                 align-items: center;
                 justify-content: center;
                 border-radius: 8px;
+                transition: color 0.2s;
+
+                &:hover {
+                    color: ${THEME.colors.text};
+                }
             `;
+
             closeBtn.onclick = () => dialog.remove();
 
+            // Append Save + Close inside buttonContainer
+            buttonContainer.appendChild(saveButton);
+            buttonContainer.appendChild(closeBtn);
+
+            // Append elements to header
             header.appendChild(title);
-            header.appendChild(closeBtn);
+            header.appendChild(buttonContainer);
+
+            // Append header to the content
             content.appendChild(header);
 
+            // **NEW: Scrollable Content Wrapper**
+            const contentWrapper = document.createElement('div');
+            contentWrapper.style.cssText = `
+                flex-grow: 1;
+                overflow-y: auto;
+                padding: 0px;
+                margin: -${THEME.sizes.spacing.sm}px;
+                scrollbar-width: thin;
+                scrollbar-color: ${THEME.colors.border} transparent;
+                max-height: calc(80vh - 60px); /* Adjust based on header height */
+            `;
+            content.appendChild(contentWrapper);      
+            
+            const labelGroup = document.createElement('div');
+            labelGroup.style.cssText = `
+              display: flex;
+              flex-direction: column;
+              margin-bottom: 8px;
+            `;
+        
+            const labelLabel = document.createElement('label');
+            labelLabel.textContent = 'Prompt Name:';
+            labelLabel.style.cssText = `
+              color: ${THEME.colors.textDim};
+              font-size: ${THEME.sizes.fontSize.normal}px;
+              margin-bottom: 4px;
+            `;
+        
+            const labelInput = document.createElement('input');
+            labelInput.type = 'text';
+            labelInput.value = labelWidget.value || '';  // existing label or empty
+            labelInput.style.cssText = `
+              width: 100%;
+              background: ${THEME.colors.surface.base};
+              border: 1px solid ${THEME.colors.border};
+              border-radius: 4px;
+              padding: 6px;
+              color: ${THEME.colors.text};
+              font-family: ${THEME.typography.fonts.primary};
+            `;
+        
+            labelGroup.appendChild(labelLabel);
+            labelGroup.appendChild(labelInput);
+            contentWrapper.appendChild(labelGroup);
+
+            const textarea = document.createElement('textarea');
+            textarea.value = textWidget.value || '';
+            textarea.style.cssText = `
+                width: 100%;
+                height: 120px;
+                background: ${THEME.colors.surface.base};
+                border: 1px solid ${THEME.colors.border};
+                border-radius: ${THEME.sizes.borderRadius}px;
+                padding: ${THEME.sizes.spacing.md}px;
+                color: ${THEME.colors.text};
+                font-size: ${THEME.sizes.fontSize.normal}px;
+                font-family: ${THEME.typography.fonts.primary};
+                line-height: 1.5;
+                resize: vertical;
+                margin-bottom: ${THEME.sizes.spacing.md}px;
+            `;
+            contentWrapper.appendChild(textarea);
+
+            //Append pre-set container after text area
             const presetContainer = document.createElement('div');
             presetContainer.style.cssText = `
                 display: flex;
@@ -1008,25 +1224,7 @@ const MultiTextNode = {
                 presetContainer.appendChild(select);
             });
             
-            content.appendChild(presetContainer);
-
-            const textarea = document.createElement('textarea');
-            textarea.value = textWidget.value || '';
-            textarea.style.cssText = `
-                width: 100%;
-                height: 120px;
-                background: ${THEME.colors.surface.base};
-                border: 1px solid ${THEME.colors.border};
-                border-radius: ${THEME.sizes.borderRadius}px;
-                padding: ${THEME.sizes.spacing.md}px;
-                color: ${THEME.colors.text};
-                font-size: ${THEME.sizes.fontSize.normal}px;
-                font-family: ${THEME.typography.fonts.primary};
-                line-height: 1.5;
-                resize: vertical;
-                margin-bottom: ${THEME.sizes.spacing.md}px;
-            `;
-            content.appendChild(textarea);
+            contentWrapper.appendChild(presetContainer);
 
             const weightGroup = document.createElement('div');
             weightGroup.style.cssText = `
@@ -1062,7 +1260,7 @@ const MultiTextNode = {
 
             weightGroup.appendChild(weightLabel);
             weightGroup.appendChild(weightInput);
-            content.appendChild(weightGroup);
+            contentWrapper.appendChild(weightGroup);
 
             const toolbar = document.createElement('div');
             toolbar.style.cssText = `
@@ -1128,7 +1326,7 @@ const MultiTextNode = {
                     }
                 };
 
-                toolbar.appendChild(btn);
+                weightGroup.appendChild(btn);
             });
 
             const history = this.loadPromptHistory();
@@ -1228,8 +1426,8 @@ const MultiTextNode = {
                 historyDropdown.appendChild(emptyMessage);
             }
 
-            toolbar.appendChild(historyDropdown);
-            content.appendChild(toolbar);
+            weightGroup.appendChild(historyDropdown);
+            contentWrapper.appendChild(toolbar);
 
             const templateSection = document.createElement('div');
             templateSection.style.cssText = `
@@ -1275,7 +1473,7 @@ const MultiTextNode = {
                 grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
                 gap: 8px;
                 overflow-y: auto;
-                max-height: 200px;
+                max-height: 0px;
                 transition: max-height 0.3s ease-out;
                 padding-right: 8px;
                 margin-right: -8px;
@@ -1361,61 +1559,42 @@ const MultiTextNode = {
             });
 
             templateSection.appendChild(templateGrid);
-            content.appendChild(templateSection);
+            contentWrapper.appendChild(templateSection);
 
-            const saveButton = document.createElement('button');
-            saveButton.textContent = 'Save';
-            saveButton.style.cssText = `
-                width: 100%;
-                padding: 12px;
-                background: ${THEME.colors.accent};
-                border: none;
-                border-radius: 8px;
-                color: white;
-                font-size: 14px;
-                font-weight: 600;
-                cursor: pointer;
-            `;
 
-            saveButton.onclick = () => {
-                textWidget.value = textarea.value;
-                weightWidget.value = parseFloat(weightInput.value);
-                this.saveToHistory(textarea.value);
-                dialog.remove();
-                this.setDirtyCanvas(true);
-            };
-
-            content.appendChild(saveButton);
 
             dialog.appendChild(content);
             document.body.appendChild(dialog);
-
+            // 1) Get the graph container’s bounding box
             const container = document.querySelector('.graph-canvas-container');
             const containerRect = container.getBoundingClientRect();
 
+            // 2) Position the dialog (desiredLeft, desiredTop = where you'd like it to go)
             const dialogRect = dialog.getBoundingClientRect();
-
             let desiredLeft = (window.innerWidth - dialogRect.width) / 2;
-            let desiredTop = (window.innerHeight - dialogRect.height) / 2;
+            let desiredTop  = (window.innerHeight - dialogRect.height) / 2;
 
+            // 3) Clamp so the dialog stays fully within containerRect
+            //    (left/right, top/bottom)
             const clampedLeft = Math.max(
-                containerRect.left,
-                Math.min(containerRect.right - dialogRect.width, desiredLeft)
+            containerRect.left,
+            Math.min(containerRect.right - dialogRect.width, desiredLeft)
             );
 
             const clampedTop = Math.max(
-                containerRect.top,
-                Math.min(containerRect.bottom - dialogRect.height, desiredTop)
+            containerRect.top,
+            Math.min(containerRect.bottom - dialogRect.height, desiredTop)
             );
 
+            // 4) Apply the clamped coords
             dialog.style.left = clampedLeft + 'px';
-            dialog.style.top = clampedTop + 'px';
+            dialog.style.top  = clampedTop + 'px';
             dialog.style.transform = 'none';
 
             textarea.focus();
 
         } catch (error) {
-            console.error('Dialog creation error:', error);
+            console.error('Dialog oluşturma hatası:', error);
         }
     },
 
@@ -1429,10 +1608,12 @@ const MultiTextNode = {
         let y = margin;
 
         for (let i = 0; i < this.activePrompts; i++) {
+            const labelWidget  = this.widgets.find(w => w.name === `label${i+1}`);
             const textWidget = this.widgets.find(w => w.name === `text${i + 1}`);
             const weightWidget = this.widgets.find(w => w.name === `weight${i + 1}`);
+            const enabledWidget = this.widgets.find(w => w.name === `enabled${i+1}`);
             
-            if (textWidget && weightWidget) {
+            if (labelWidget && textWidget && weightWidget) {
                 if (i === this.currentHoverIndex) {
                     UXUtils.drawHoverEffect(
                         ctx,
@@ -1448,11 +1629,19 @@ const MultiTextNode = {
                     ctx, 
                     margin, 
                     y, 
-                    textWidget.value || `Prompt ${i + 1}`,
+                    labelWidget.value || textWidget.value || `Prompt ${i + 1}`,
                     weightWidget.value,
                     rowWidth,
                     rowHeight,
                     4
+                );
+
+                // Draw a small toggle box on the left side:
+                this.drawToggle(
+                    ctx,
+                    margin + 4,      // x offset
+                    y + rowHeight/2, // center y
+                    enabledWidget.value // true/false
                 );
                 y += rowHeight + rowMargin;
             }
@@ -1469,6 +1658,33 @@ const MultiTextNode = {
             );
         }
     },
+
+    drawToggle(ctx, x, centerY, isEnabled) {
+        const width = 30;  // Width of the switch
+        const height = 14;  // Height of the switch
+        const radius = height / 2;  // Rounded corners
+        const toggleX = x;
+        const toggleY = centerY - height / 2;
+    
+        // Background color (track)
+        ctx.save();
+        ctx.fillStyle = isEnabled ? THEME.colors.accent : THEME.colors.border;
+        ctx.beginPath();
+        ctx.roundRect(toggleX, toggleY, width, height, radius);
+        ctx.fill();
+    
+        // Handle (circle inside)
+        const handleRadius = radius - 2;
+        const handleX = isEnabled ? toggleX + width - handleRadius * 2 - 2 : toggleX + 2;
+        const handleY = toggleY + 2;
+    
+        ctx.fillStyle = THEME.colors.text;
+        ctx.beginPath();
+        ctx.arc(handleX + handleRadius, handleY + handleRadius, handleRadius, 0, Math.PI * 2);
+        ctx.fill();
+    
+        ctx.restore();
+    },    
 
     drawPromptRow(ctx, x, y, index, text, weight) {
         const rowWidth = this.size[0] - (STYLES.row.padding * 2);
@@ -1592,11 +1808,18 @@ const MultiTextNode = {
     addPrompt() {
         if (this.activePrompts < this.maxPrompts) {
             this.activePrompts++;
+    
+            // **Find the new enabledX widget and disable it by default**
+            const newEnabledWidget = this.widgets.find(w => w.name === `enabled${this.activePrompts}`);
+            if (newEnabledWidget) {
+                newEnabledWidget.value = false;
+            }
+    
             localStorage.setItem('multitext_prompt_count', this.activePrompts.toString());
             this.updateNodeSize();
             this.setDirtyCanvas(true);
         }
-    },
+    },    
 
     removePrompt() {
         if (this.activePrompts > 1) {
@@ -1623,6 +1846,9 @@ const MultiTextNode = {
         const addX = this.size[0] - margin - buttonSize;
         const removeX = addX - buttonSize - buttonMargin;
         const separatorX = margin;
+        const toggleX = margin + buttonSize + buttonMargin + 10; // Toggle position
+        const toggleWidth = 40;
+        const toggleHeight = 20;
 
         return {
             add: x >= addX && x <= addX + buttonSize && 
@@ -1630,7 +1856,9 @@ const MultiTextNode = {
             remove: x >= removeX && x <= removeX + buttonSize && 
                    y >= controlsY && y <= controlsY + buttonSize,
             separator: x >= separatorX && x <= separatorX + buttonSize && 
-                      y >= controlsY && y <= controlsY + buttonSize
+                      y >= controlsY && y <= controlsY + buttonSize,
+            toggle: x >= toggleX && x <= toggleX + toggleWidth && 
+                    y >= controlsY && y <= controlsY + toggleHeight 
         };
     },
 
@@ -1638,6 +1866,7 @@ const MultiTextNode = {
         const margin = STYLES.row.padding;
         const buttonSize = THEME.controls.button.size;
         const buttonMargin = THEME.controls.button.margin;
+        const toggleX = margin + buttonSize + buttonMargin + 20; // Position right of separator
 
         const y = margin + (this.activePrompts * (STYLES.row.height + STYLES.row.margin)) + buttonMargin;
         const addX = this.size[0] - margin - buttonSize;
@@ -1652,6 +1881,9 @@ const MultiTextNode = {
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.fillText('⋮', separatorX + buttonSize/2, y + buttonSize/2);
+
+         // **Toggle Switch for Single/Multi-Prompt Mode**
+        this.drawToggleSwitch(ctx, toggleX, y, buttonSize, this.isSinglePromptMode);
 
         ctx.fillStyle = this.activePrompts > 1 ? THEME.controls.button.colors.bg : THEME.controls.button.colors.bgDisabled;
         Utils.drawRoundedRect(ctx, removeX, y, buttonSize, buttonSize, THEME.controls.button.borderRadius);
@@ -1674,6 +1906,40 @@ const MultiTextNode = {
         ctx.lineTo(addX + buttonSize/2, y + buttonSize - 6);
         ctx.stroke();
     },
+
+    drawToggleSwitch(ctx, x, y, size, isSingleMode) {
+        const width = 40; // Toggle width
+        const height = 20; // Toggle height
+        const radius = height / 2;
+        const offset = 15; // Shift to the right by 10px
+        const toggleX = x + offset; // Shifted toggle position
+        const toggleY = y + (size - height) / 2;
+    
+        // Labels
+        ctx.fillStyle = THEME.colors.textDim;
+        ctx.font = `12px ${THEME.typography.fonts.primary}`;
+        ctx.textAlign = "right";
+        ctx.fillText("Multi", toggleX - 5, toggleY + height / 1.5); // Left Label
+    
+        ctx.textAlign = "left";
+        ctx.fillText("Single", toggleX + width + 4, toggleY + height / 1.5); // Right Label
+    
+        // Background (track)
+        ctx.fillStyle = isSingleMode ? THEME.colors.accent : THEME.colors.border;
+        ctx.beginPath();
+        ctx.roundRect(toggleX, toggleY, width, height, radius);
+        ctx.fill();
+    
+        // Handle (circle)
+        const handleRadius = radius - 3;
+        const handleX = isSingleMode ? toggleX + width - handleRadius * 2 - 4 : toggleX + 4;
+        const handleY = toggleY + 4;
+    
+        ctx.fillStyle = THEME.colors.text;
+        ctx.beginPath();
+        ctx.arc(handleX + handleRadius, handleY + handleRadius, handleRadius, 0, Math.PI * 2);
+        ctx.fill();
+    },    
 
     updateNodeSize() {
         const margin = STYLES.row.padding;
@@ -1729,7 +1995,7 @@ const MultiTextNode = {
 
     onMouseMove(event, pos) {
         const index = this.getHoveredWidgetIndex(pos);
-        
+        if(app.ui.settings.getSettingValue("SKB.ShowTooltips", false)){
         if (this.currentHoverIndex === index) {
             if (this.tooltipState.visible) {
                 this.tooltipState.x = pos[0];
@@ -1762,19 +2028,37 @@ const MultiTextNode = {
         }
 
         this.setDirtyCanvas(true);
+        } else {
+            this.tooltipState.visible = false;
+            this.setDirtyCanvas(true);
+        }
+
+        
     },
 
     combine_text(separator=" ", active=true, kwargs) {
         if (!active) {
             return [""];
         }
-
+    
         const texts = [];
-        
-        for (let i = 1; i <= 8; i++) {
+    
+        for (let i = 1; i <= 20; i++) {
+            // Check if the prompt is enabled
+            const isEnabled = kwargs[`enabled${i}`];
+            if (isEnabled === false) {
+                // skip if disabled
+                continue;
+            }
+    
+            // parse weight safely (with fallback=1.0)
+            let weightRaw = kwargs[`weight${i}`];
+            if (weightRaw == null || isNaN(parseFloat(weightRaw))) {
+                weightRaw = 1.0;
+            }
+            const weight = parseFloat(weightRaw);
+    
             const text = (kwargs[`text${i}`] || "").trim();
-            const weight = kwargs[`weight${i}`] || 1.0;
-            
             if (text) {
                 if (weight === 1.0) {
                     texts.push(text);
@@ -1783,9 +2067,10 @@ const MultiTextNode = {
                 }
             }
         }
-
+    
         return [texts.join(separator)];
     },
+    
 
     loadPresets() {
         try {
@@ -2413,4 +2698,11 @@ app.registerExtension({
         
         nodeType.prototype.loadFonts();
     }
+});
+
+app.ui.settings.addSetting({
+    id: "SKB.ShowTooltips",
+    name: "Show Multi-Text tooltips on hover?",
+    type: "boolean",
+    defaultValue: false,
 });
