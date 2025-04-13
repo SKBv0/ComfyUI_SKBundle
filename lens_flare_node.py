@@ -13,7 +13,7 @@ class LensFlare:
                 "flare_type": (["50MM_PRIME", "COOL_FLARE", "GOBLIN", "GOLDEN_SUN", "GREEN_GRANITE", 
                                "GREEN_SPOTLIGHT", "LASER", "MOONS", "ANAMORPHIC_PRO", "VINTAGE_85MM", 
                                "CYBERPUNK", "ETHEREAL", "PRISM", "SUNSET_GLOW", "NEON_NIGHTS", "DREAMY",
-                               "Quantum Flare", "Fractal Dreams", "Time Warp", "Neural Network"], 
+                               "QUANTUM_FLARE", "FRACTAL_DREAMS", "TIME_WARP", "NEURAL_NETWORK", "TORCH"], 
                                {"default": "50MM_PRIME"}),
                 "blend_mode": (["normal", "screen", "lighter", "overlay", "soft-light", "add", "overlay", "hard-light", "color-dodge", "linear-dodge"], {"default": "screen"}),
                 "canvas_image": ("STRING", {"default": "", "hidden": True})

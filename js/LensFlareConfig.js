@@ -1,13 +1,34 @@
 export const COLOR_UTILITIES = {
-    rgbToHex: (r, g, b) => `#${[r,g,b].map(x => x.toString(16).padStart(2,'0')).join('')}`,
+    _rgbToHexCache: new Map(),
+    _hexToRgbCache: new Map(),
+    
+    rgbToHex: (r, g, b) => {
+        const cacheKey = `${r},${g},${b}`;
+        if (COLOR_UTILITIES._rgbToHexCache.has(cacheKey)) {
+            return COLOR_UTILITIES._rgbToHexCache.get(cacheKey);
+        }
+        
+        const result = `#${[r,g,b].map(x => x.toString(16).padStart(2,'0')).join('')}`;
+        COLOR_UTILITIES._rgbToHexCache.set(cacheKey, result);
+        return result;
+    },
+    
     hexToRgb: (hex) => {
+        if (COLOR_UTILITIES._hexToRgbCache.has(hex)) {
+            return COLOR_UTILITIES._hexToRgbCache.get(hex);
+        }
+        
         const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-        return result ? [
+        const rgb = result ? [
             parseInt(result[1], 16),
             parseInt(result[2], 16),
             parseInt(result[3], 16)
         ] : [255,255,255];
+        
+        COLOR_UTILITIES._hexToRgbCache.set(hex, rgb);
+        return rgb;
     },
+    
     rgbToObject: (rgbArray) => ({ r: rgbArray[0], g: rgbArray[1], b: rgbArray[2] })
 };
 
@@ -65,12 +86,25 @@ const BASE_FLARE_SETTINGS = {
 };
 
 
-const createGhostSettings = (count, spacingPower = 1.5) => ({
-    ghostCount: count,
-    ghostSpacing: Array.from({length: count}, (_, i) => Math.pow(i/(count-1), spacingPower)),
-    ghostSizes: Array.from({length: count}, (_, i) => 0.9 - (i * 0.07)),
-    ghostOpacities: Array.from({length: count}, (_, i) => 0.5 - (i * 0.03))
-});
+const createGhostSettings = (count, spacingPower = 1.5) => {
+    // Pre-allocate arrays for better performance
+    const ghostSpacing = new Array(count);
+    const ghostSizes = new Array(count);
+    const ghostOpacities = new Array(count);
+    
+    for (let i = 0; i < count; i++) {
+        ghostSpacing[i] = Math.pow(i/(count-1), spacingPower);
+        ghostSizes[i] = 0.9 - (i * 0.07);
+        ghostOpacities[i] = 0.5 - (i * 0.03);
+    }
+    
+    return {
+        ghostCount: count,
+        ghostSpacing,
+        ghostSizes,
+        ghostOpacities
+    };
+};
 
 export const DEFAULT_FLARE_CONFIGS = {
     "50MM_PRIME": {
@@ -837,52 +871,232 @@ export const SLIDER_STYLES = {
 export const PERFORMANCE_CONSTANTS = {
     RENDER_THROTTLE: 16,
     SLIDER_UPDATE_THROTTLE: 32,
-    CACHE_SIZE: 10
+    CACHE_SIZE: 10,
+    DUST_PATTERN_CACHE_SIZE: 20,
+    MAX_COLOR_CACHE_SIZE: 500
 };
 
 export const UI_STYLES = {
     DIALOG: {
-        BACKGROUND: "red",
-        HEADER: "rgba(17, 24, 39, 0.95)",
-        BORDER: "rgba(255,255,255,0.1)",
-        BACKDROP_FILTER: "blur(12px)",
-        TEXT: {
-            PRIMARY: "#F9FAFB",
-            SECONDARY: "#9CA3AF",
-            ACCENT: "#3B82F6"
-        },
-        SHADOWS: {
-            LIGHT: "0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06)",
-            MEDIUM: "0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05)",
-            HEAVY: "0 20px 25px -5px rgba(0,0,0,0.1), 0 10px 10px -5px rgba(0,0,0,0.04)"
-        }
+        MAIN: `
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 800px;
+            height: 600px;
+            background: #1a1a1a;
+            border: 1px solid #333;
+            border-radius: 8px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            z-index: 10000;
+        `,
+        HEADER: `
+            padding: 16px 20px;
+            background: linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0.02));
+            backdrop-filter: blur(12px);
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            cursor: move;
+        `,
+        CONTENT: `
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+            max-height: calc(80vh - 120px);
+        `,
+        CLOSE_BUTTON: `
+            cursor: pointer;
+            padding: 8px;
+            border-radius: 8px;
+            transition: all 0.2s ease;
+            background: rgba(255,255,255,0.05);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        `,
+        BUTTON_CONTAINER: `
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            padding: 16px 20px;
+            border-top: 1px solid rgba(255,255,255,0.05);
+        `
     },
-    SLIDER_GROUP: {
-        CONTAINER: `
-            padding: 10px;
-            border-radius: 5px;
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+    SECTION: {
+        CONTROL: `
+            background: rgba(0,0,0,0.2);
+            padding: 16px;
+            border-radius: 12px;
+            border: 1px solid rgba(255,255,255,0.05);
         `,
         HEADER: `
             display: flex;
             align-items: center;
-            gap: 10px;
-            margin-bottom: 20px;
+            gap: 8px;
+            margin-bottom: 16px;
         `,
-        HEADER_ICON: `
-            color: #4a9eff;
-            font-size: 18px;
+        TITLE: `
+            color: #eee;
+            font-size: 13px;
+            font-weight: 500;
+        `
+    },
+    COLOR: {
+        INPUT_CONTAINER: `
+            display: flex;
+            align-items: center;
+            background: rgba(0,0,0,0.2);
+            padding: 6px;
+            border-radius: 6px;
+            border: 1px solid rgba(255,255,255,0.05);
         `,
-        HEADER_TEXT: `
-            color: #ffffff;
-            font-size: 14px;
-            font-weight: 600;
+        INPUT: `
+            width: 24px;
+            height: 24px;
+            border: none;
+            background: none;
+            cursor: pointer;
         `,
-        SLIDERS_CONTAINER: `
+        HEX_DISPLAY: `
+            margin-left: 6px;
+            font-family: monospace;
+            color: #aaa;
+            font-size: 10px;
+        `,
+        LABEL: `
+            display: block; 
+            color: #888; 
+            font-size: 11px; 
+            margin-bottom: 4px;
+        `
+    },
+    BUTTON: {
+        PRIMARY: `
+            background: linear-gradient(45deg, #4a9eff, #2d7ed9);
+            color: #fff;
+            border: none;
+            border-radius: 6px;
+            padding: 8px 16px;
+            cursor: pointer;
+            font-size: 13px;
+            transition: all 0.2s ease;
+        `,
+        SECONDARY: `
+            background: rgba(255,255,255,0.05);
+            color: #ccc;
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 6px;
+            padding: 8px 16px;
+            cursor: pointer;
+            font-size: 13px;
+            transition: all 0.2s ease;
+        `
+    },
+    GRID: {
+        COLUMNS_3: `
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 16px;
+        `,
+        COLUMNS_2: `
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 4px;
+        `,
+        COLUMNS_7: `
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 4px;
+        `,
+        COLUMNS_AUTO_FIT: `
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 16px;
+        `,
+        FLEX_COLUMN: `
             display: flex;
             flex-direction: column;
-            gap: 14px;
+            gap: 8px;
+            padding: 8px;
+        `
+    },
+    SLIDER_GROUP: {
+        CONTAINER: `
+            /* background: rgba(0,0,0,0.2); */ /* Removed background */
+            padding: 6px;
+            border-radius: 5px;
+        `,
+        HEADER: `
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 4px;
+        `,
+        HEADER_LABEL: `
+            color: #888;
+            font-size: 11px;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        `,
+        HEADER_ICON: `
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        `,
+        HEADER_VALUE: `
+            color: #4a9eff;
+            font-size: 11px;
+            font-weight: 500;
+        `,
+        SLIDER_CONTAINER: `
+            background: rgba(255,255,255,0.03);
+            border-radius: 4px;
+            padding: 2px;
+            position: relative;
+        `,
+        SLIDER_INPUT: `
+            width: 100%;
+            -webkit-appearance: none;
+            background: linear-gradient(90deg, #4a9eff var(--percent, 50%), rgba(255,255,255,0.1) var(--percent, 50%));
+            cursor: pointer;
+            height: 4px;
+            border-radius: 2px;
+        `,
+        CATEGORY_CONTAINER: `
+            background: rgba(0,0,0,0.2);
+            padding: 16px;
+            border-radius: 12px;
+            border: 1px solid rgba(255,255,255,0.05);
+        `,
+        CATEGORY_HEADER: `
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 16px;
+        `,
+        CATEGORY_HEADER_ICON: `
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            color: #4a9eff;
+        `,
+        CATEGORY_HEADER_TEXT: `
+            color: #eee;
+            font-size: 13px;
+            font-weight: 500;
+        `,
+        CATEGORY_SLIDERS_CONTAINER: `
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
         `
     }
 };
@@ -917,10 +1131,36 @@ export const ATMOSPHERIC_EFFECTS = {
     },
     DUST_PARTICLES: {
         COUNT_MULTIPLIER: 50,
-        ANGLES: Array.from({ length: 12 }, (_, i) => i * 30),
-        DISTANCES: Array.from({ length: 12 }, (_, i) => (i + 3) * 0.1),
-        SIZES: Array.from({ length: 12 }, (_, i) => (i + 5) * 0.2),
-        OPACITIES: Array.from({ length: 12 }, (_, i) => (i + 1) * 0.02),
+        // Memoized arrays
+        _angles: null,
+        _distances: null,
+        _sizes: null,
+        _opacities: null,
+        
+        get ANGLES() {
+            if (!this._angles) {
+                this._angles = Array.from({ length: 12 }, (_, i) => i * 30);
+            }
+            return this._angles;
+        },
+        get DISTANCES() {
+            if (!this._distances) {
+                this._distances = Array.from({ length: 12 }, (_, i) => (i + 3) * 0.1);
+            }
+            return this._distances;
+        },
+        get SIZES() {
+            if (!this._sizes) {
+                this._sizes = Array.from({ length: 12 }, (_, i) => (i + 5) * 0.2);
+            }
+            return this._sizes;
+        },
+        get OPACITIES() {
+            if (!this._opacities) {
+                this._opacities = Array.from({ length: 12 }, (_, i) => (i + 1) * 0.02);
+            }
+            return this._opacities;
+        },
         PATTERN: {
             NOISE_SCALE: 0.8,
             TURBULENCE: 0.4,
@@ -995,17 +1235,60 @@ export function createPresetGhostSettings(presetName = 'DEFAULT') {
     return createGhostSettings(preset.count, preset.spacingPower);
 }
 
-export const VECTOR_UTILS = {
-    polarToCartesian: (radius, angle) => ({
-        x: radius * Math.cos(angle),
-        y: radius * Math.sin(angle)
-    }),
-    rotatePoint: (x, y, angle) => ({
-        x: x * Math.cos(angle) - y * Math.sin(angle),
-        y: x * Math.sin(angle) + y * Math.cos(angle)
-    })
-};
+// Pre-compute sine and cosine values for common angles
+const SIN_CACHE = new Float32Array(361); // 0-360 degrees
+const COS_CACHE = new Float32Array(361);
 
+// Initialize cache
+for (let i = 0; i <= 360; i++) {
+    const rad = i * Math.PI / 180;
+    SIN_CACHE[i] = Math.sin(rad);
+    COS_CACHE[i] = Math.cos(rad);
+}
+
+export const VECTOR_UTILS = {
+    // Get cached sine/cosine for integer degrees
+    getCachedSin: (degrees) => {
+        const intDeg = Math.round(degrees) % 360;
+        return SIN_CACHE[intDeg >= 0 ? intDeg : intDeg + 360];
+    },
+    
+    getCachedCos: (degrees) => {
+        const intDeg = Math.round(degrees) % 360;
+        return COS_CACHE[intDeg >= 0 ? intDeg : intDeg + 360];
+    },
+    
+    // Optimized versions using cached values when possible
+    polarToCartesian: (radius, angleDeg) => {
+        if (Number.isInteger(angleDeg)) {
+            return {
+                x: radius * VECTOR_UTILS.getCachedCos(angleDeg),
+                y: radius * VECTOR_UTILS.getCachedSin(angleDeg)
+            };
+        }
+        const angle = angleDeg * Math.PI / 180;
+        return {
+            x: radius * Math.cos(angle),
+            y: radius * Math.sin(angle)
+        };
+    },
+    
+    rotatePoint: (x, y, angleDeg) => {
+        if (Number.isInteger(angleDeg)) {
+            const cos = VECTOR_UTILS.getCachedCos(angleDeg);
+            const sin = VECTOR_UTILS.getCachedSin(angleDeg);
+            return {
+                x: x * cos - y * sin,
+                y: x * sin + y * cos
+            };
+        }
+        const angle = angleDeg * Math.PI / 180;
+        return {
+            x: x * Math.cos(angle) - y * Math.sin(angle),
+            y: x * Math.sin(angle) + y * Math.cos(angle)
+        };
+    }
+};
 
 export const RENDER_CONSTANTS = {
     DIFFRACTION: {
@@ -1069,6 +1352,189 @@ export const LENS_CHARACTERISTICS = {
         MIN: 0,
         MAX: 1,
         DEFAULT: 0.7
+    }
+};
+
+// Yardımcı fonksiyonlar - LensFlareNode.js'den taşındı
+export const FORMAT_HELPERS = {
+    _valueCache: new Map(),
+    
+    formatSliderValue: (key, value) => {
+        const cacheKey = `${key}_${value}`;
+        if (FORMAT_HELPERS._valueCache.has(cacheKey)) {
+            return FORMAT_HELPERS._valueCache.get(cacheKey);
+        }
+        
+        let result;
+        switch(key) {
+            case "color_temperature": result = `${Math.round(value)}K`; break;
+            case "rotation": result = `${Math.round(value)}°`; break;
+            case "position_x":
+            case "position_y":
+            case "starburst_position_x":
+            case "starburst_position_y": result = value.toFixed(2); break;
+            default: result = value.toFixed(2);
+        }
+        
+        // Only cache if the cache isn't too large
+        if (FORMAT_HELPERS._valueCache.size < PERFORMANCE_CONSTANTS.MAX_COLOR_CACHE_SIZE) {
+            FORMAT_HELPERS._valueCache.set(cacheKey, result);
+        }
+        
+        return result;
+    },
+    
+    createColorString: (color, opacity = 1) => {
+        if (Array.isArray(color)) {
+            return `rgba(${color[0]},${color[1]},${color[2]},${opacity})`;
+        }
+        return color;
+    },
+    
+    // Enhanced gradient creation with minimal object creation
+    createGradient: (ctx, config, x = 0, y = 0) => {
+        const { type, stops, radius } = config;
+        let gradient;
+
+        if (type === GRADIENT_HELPERS.TYPES.RADIAL) {
+            gradient = ctx.createRadialGradient(x, y, 0, x, y, radius);
+        } else {
+            gradient = ctx.createLinearGradient(x, y, x + radius, y);
+        }
+
+        stops.forEach(stop => {
+            gradient.addColorStop(stop.position, stop.color);
+        });
+
+        return gradient;
+    }
+};
+
+// Create a reusable canvas for conversions
+let _conversionCanvas = null;
+let _conversionCtx = null;
+// Dust pattern cache for expensive generation
+const _dustPatternCache = new Map();
+
+// Global yardımcı fonksiyonlar
+export const UI_HELPERS = {
+    // Image data'yı URL'e dönüştürme
+    imageDataToUrl: (data) => {
+        if (!_conversionCanvas) {
+            _conversionCanvas = document.createElement('canvas');
+            _conversionCtx = _conversionCanvas.getContext('2d');
+        }
+        
+        // Resize only if needed
+        if (_conversionCanvas.width !== data.width || _conversionCanvas.height !== data.height) {
+            _conversionCanvas.width = data.width;
+            _conversionCanvas.height = data.height;
+        }
+        
+        _conversionCtx.putImageData(data, 0, 0);
+        return _conversionCanvas.toDataURL('image/png');
+    },
+    
+    // Bir pozisyonun belirli bir alan içinde olup olmadığını kontrol etme
+    isInBounds: (x, y, area) => {
+        return x >= area.x && 
+               x <= area.x + area.width && 
+               y >= area.y && 
+               y <= area.y + area.height;
+    },
+    
+    // Optimized deterministic noise function
+    generateNoise: (x, y, freq) => {
+        return Math.sin(x * freq) * Math.cos(y * freq) * 
+               Math.sin((x + y) * freq * 0.5) * 0.5 + 0.5;
+    },
+    
+    // Optimized dust pattern generation with caching
+    generateDustPattern: (ctx, size, params, id) => {
+        // Create a cache key based on parameters
+        const dust_density = params?.dust_density || 0.3;
+        const cacheKey = `${size}_${id || "default"}_${dust_density.toFixed(2)}`;
+        
+        // Return cached pattern if available
+        if (_dustPatternCache.has(cacheKey)) {
+            return _dustPatternCache.get(cacheKey);
+        }
+        
+        const { NOISE_SCALE, TURBULENCE, DETAIL_LEVELS, BASE_FREQUENCY, PERSISTENCE } = ATMOSPHERIC_EFFECTS.DUST_PARTICLES.PATTERN;
+        
+        const tempCanvas = document.createElement('canvas');
+        tempCanvas.width = size;
+        tempCanvas.height = size;
+        const tempCtx = tempCanvas.getContext('2d');
+
+        const imageData = tempCtx.createImageData(size, size);
+        const data = imageData.data;
+
+        // Create a hash key for this dust pattern to ensure it's always the same
+        const patternKey = `${size}_${id || "default"}`;
+        
+        // Generate a deterministic seed based on the pattern key
+        let seed = 0;
+        for (let i = 0; i < patternKey.length; i++) {
+            seed += patternKey.charCodeAt(i);
+        }
+
+        // Pre-compute sin/cos lookup values for the pattern
+        const xSin = new Float32Array(size);
+        const yCos = new Float32Array(size);
+        for (let i = 0; i < size; i++) {
+            xSin[i] = Math.sin((i + seed) / size * Math.PI * 2) * TURBULENCE;
+            yCos[i] = Math.cos((i + seed) / size * Math.PI * 2) * TURBULENCE;
+        }
+
+        // Calculate threshold once
+        const threshold = 1 - dust_density;
+        const invThreshold = 1 - threshold > 0 ? 255 / (1 - threshold) : 0;
+
+        for (let y = 0; y < size; y++) {
+            const deterministicTurbulenceY = yCos[y];
+            
+            for (let x = 0; x < size; x++) {
+                const index = (y * size + x) * 4;
+                let value = 0;
+                let amplitude = 1;
+                let frequency = BASE_FREQUENCY;
+                const deterministicTurbulenceX = xSin[x];
+                
+                for (let i = 0; i < DETAIL_LEVELS; i++) {
+                    value += UI_HELPERS.generateNoise(
+                        x * NOISE_SCALE + deterministicTurbulenceX,
+                        y * NOISE_SCALE + deterministicTurbulenceY,
+                        frequency
+                    ) * amplitude;
+                    
+                    frequency *= 2;
+                    amplitude *= PERSISTENCE;
+                }
+
+                // Gürültü değerini [0, 1] aralığına normalize edelim
+                value = Math.max(0, Math.min(1, value / DETAIL_LEVELS));
+                
+                // Threshold filtresi optimize edilmiş versiyonu
+                const alpha = value > threshold ? (value - threshold) * invThreshold : 0;
+                
+                data[index] = 255;     // R
+                data[index + 1] = 255; // G
+                data[index + 2] = 255; // B
+                data[index + 3] = alpha; // Alpha
+            }
+        }
+
+        tempCtx.putImageData(imageData, 0, 0);
+        
+        // Cache management - remove oldest entry if cache is full
+        if (_dustPatternCache.size >= PERFORMANCE_CONSTANTS.DUST_PATTERN_CACHE_SIZE) {
+            const firstKey = _dustPatternCache.keys().next().value;
+            _dustPatternCache.delete(firstKey);
+        }
+        
+        _dustPatternCache.set(cacheKey, tempCanvas);
+        return tempCanvas;
     }
 };
 

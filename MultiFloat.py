@@ -1,9 +1,3 @@
-class AnyType(str):
-    def __ne__(self, __value: object) -> bool:
-        return False
-
-ANY = AnyType("*")
-
 class MultiFloat:
     @classmethod
     def INPUT_TYPES(cls):

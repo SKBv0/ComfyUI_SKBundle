@@ -7,7 +7,6 @@ import {
     DEFAULT_WIDGET_VALUES,
     SLIDER_RANGES,
     SLIDER_CATEGORIES,
-    UI_STYLES,
     NODE_UI_CONSTANTS,
     SLIDER_CONFIG,
     ATMOSPHERIC_EFFECTS,
@@ -17,23 +16,14 @@ import {
     COLOR_UTILITIES,
     GHOST_PRESETS,
     VECTOR_UTILS,
-    RENDER_CONSTANTS
+    RENDER_CONSTANTS,
+    FORMAT_HELPERS,
+    UI_HELPERS,
+    UI_STYLES
 } from "./LensFlareConfig.js";
 
-function imageDataToUrl(data) {
-    return api.apiURL(`/view?filename=${encodeURIComponent(data.filename)}&type=${data.type}&subfolder=${encodeURIComponent(data.subfolder)}${app.getPreviewFormatParam()}${app.getRandParam()}`);
-}
-
-function isInBounds(x, y, area) {
-    if (!area) return false;
-    return x >= area.x && 
-           x <= area.x + area.width && 
-           y >= area.y && 
-           y <= area.y + area.height;
-}
-
 app.registerExtension({
-    name: "skb.LensFlare",
+    name: "ComfyUI.SKBundle.LensFlare",
     async beforeRegisterNodeDef(nodeType, nodeData, app) {
         if (nodeData.name !== "LensFlare") return;
 
@@ -41,11 +31,79 @@ app.registerExtension({
         nodeType.prototype.onNodeCreated = function() {
             const r = onNodeCreated ? onNodeCreated.apply(this, arguments) : undefined;
             
-            this._initializeWidgets();
-            this._initializeNodeProperties();
-            this._initializeUIState();
-            this._initializeCanvasState();
             
+            this.UI_CONSTANTS = {
+                PADDING: 20,
+                SECTION_SPACING: 25,
+                PREVIEW_HEIGHT: 320,
+                HEADER_HEIGHT: 40,
+                CONTROL_HEIGHT: 30,
+                SLIDER_WIDTH: 360,
+                DIALOG_HEADER_HEIGHT: 40
+            };
+
+            
+            this.dialog = {
+                isOpen: false,
+                position: { x: 0, y: 0 },
+                size: { width: 400, height: 500 },
+                isDragging: false,
+                dragOffset: { x: 0, y: 0 }
+            };
+
+            
+            this.isDragging = false;
+            this.isPointerOver = false;
+            this.offscreenCanvas = document.createElement('canvas');
+            
+            
+            if (!this.widgets || !this.widgets.length) {
+                this.addWidget("combo", "flare_type", this.properties.flare_type || "50MM_PRIME", function(v) { this.properties.flare_type = v; }, { values: Object.keys(FLARE_TYPES) });
+                this.addWidget("combo", "blend_mode", this.properties.blend_mode || "screen", function(v) { this.properties.blend_mode = v; }, { values: Object.keys(BLEND_MODES) });
+                this.addWidget("string", "canvas_image", "", function(v) { this.properties.canvas_image = v; }, { hidden: true });
+                
+                
+                Object.entries(DEFAULT_WIDGET_VALUES).forEach(([key, defaultValue]) => {
+                    if (key !== 'flare_type' && key !== 'blend_mode' && key !== 'canvas_image') {
+                        const range = SLIDER_RANGES[key] || { min: 0, max: 1, step: 0.01 };
+                        this.addWidget("number", key, defaultValue, function(v) { this.properties[key] = v; }, range);
+                    }
+                });
+            }
+
+            
+            this.widgets.forEach(w => {
+                w.hidden = true;
+            });
+
+            
+            this.properties = this.properties || {};
+            Object.assign(this.properties, DEFAULT_WIDGET_VALUES);
+            this.properties.flare_type = this.properties.flare_type || "50MM_PRIME";
+
+            
+            const defaultConfig = DEFAULT_FLARE_CONFIGS[this.properties.flare_type];
+            if (defaultConfig) {
+                const initialMainColor = defaultConfig.mainColor || { r: 255, g: 255, b: 255 };
+                const initialSecondaryColor = defaultConfig.secondaryColor || { r: 255, g: 255, b: 255 };
+                const initialGhostColor = defaultConfig.ghostColor || { r: 255, g: 255, b: 255 };
+
+                this.properties.main_color = [initialMainColor.r, initialMainColor.g, initialMainColor.b];
+                this.properties.secondary_color = [initialSecondaryColor.r, initialSecondaryColor.g, initialSecondaryColor.b];
+                this.properties.starburst_color = [initialMainColor.r, initialMainColor.g, initialMainColor.b];
+                this.properties.ghost_color = [initialGhostColor.r, initialGhostColor.g, initialGhostColor.b];
+
+                this.ghostCount = defaultConfig.ghostCount;
+                this.ghostSpacing = defaultConfig.ghostSpacing;
+                this.ghostSizes = defaultConfig.ghostSizes;
+                this.ghostOpacities = defaultConfig.ghostOpacities;
+                this.anamorphicStretch = defaultConfig.anamorphicStretch;
+            }
+
+            
+            this._staticDustParticles = {};
+
+            this.serialize_widgets = true;
             this.onConnectionsChange = this._handleConnectionsChange.bind(this);
             
             return r;
@@ -59,6 +117,7 @@ app.registerExtension({
                     if (w.name in DEFAULT_WIDGET_VALUES) {
                         w.value = DEFAULT_WIDGET_VALUES[w.name];
                     }
+
                 }
             }
             this.serialize_widgets = true;
@@ -79,29 +138,26 @@ app.registerExtension({
 
             const defaultConfig = DEFAULT_FLARE_CONFIGS[this.properties.flare_type];
             if (defaultConfig) {
-                Object.assign(this, {
-                    mainColor: defaultConfig.mainColor,
-                    secondaryColor: defaultConfig.secondaryColor,
-                    ghostCount: defaultConfig.ghostCount,
-                    ghostSpacing: defaultConfig.ghostSpacing,
-                    ghostSizes: defaultConfig.ghostSizes,
-                    ghostOpacities: defaultConfig.ghostOpacities,
-                    anamorphicStretch: defaultConfig.anamorphicStretch
-                });
                 
+                const initialMainColor = defaultConfig.mainColor || { r: 255, g: 255, b: 255 };
+                const initialSecondaryColor = defaultConfig.secondaryColor || { r: 255, g: 255, b: 255 };
+                const initialGhostColor = defaultConfig.ghostColor || { r: 255, g: 255, b: 255 };
 
-                this.properties.starburst_color = [defaultConfig.mainColor.r, defaultConfig.mainColor.g, defaultConfig.mainColor.b];
-                this.properties.ghost_color = defaultConfig.ghostColor 
-                    ? [defaultConfig.ghostColor.r, defaultConfig.ghostColor.g, defaultConfig.ghostColor.b]
-                    : [255,255,255];
+                this.properties.main_color = [initialMainColor.r, initialMainColor.g, initialMainColor.b];
+                this.properties.secondary_color = [initialSecondaryColor.r, initialSecondaryColor.g, initialSecondaryColor.b];
+                this.properties.starburst_color = [initialMainColor.r, initialMainColor.g, initialMainColor.b]; 
+                this.properties.ghost_color = [initialGhostColor.r, initialGhostColor.g, initialGhostColor.b];
+
                 
-
-                this.properties.secondary_color = [
-                    defaultConfig.secondaryColor.r,
-                    defaultConfig.secondaryColor.g,
-                    defaultConfig.secondaryColor.b
-                ];
+                this.ghostCount = defaultConfig.ghostCount;
+                this.ghostSpacing = defaultConfig.ghostSpacing;
+                this.ghostSizes = defaultConfig.ghostSizes;
+                this.ghostOpacities = defaultConfig.ghostOpacities;
+                this.anamorphicStretch = defaultConfig.anamorphicStretch;
             }
+            
+            
+            this._staticDustParticles = {}; 
         };
 
 
@@ -126,211 +182,155 @@ app.registerExtension({
         };
 
 
-        nodeType.prototype._handleConnectionsChange = function(type, index, connected, link_info) {
-            if (type === 1) {
-                if (connected && link_info) {
-                    const inputNode = app.graph.getNodeById(link_info.origin_id);
-                    if (inputNode) {
-                        if (inputNode.imgs && inputNode.imgs.length > 0) {
-                            this.imgs = [inputNode.imgs[0]];
-                            this.applyFlareTypeSettings("50MM_PRIME");
-                            if (this.graph && app.graph?.canvas) {
-                            this.setDirtyCanvas(true);
-                            }
-                        } else if (inputNode.imageData) {
-                            const img = new Image();
-                            const url = imageDataToUrl(inputNode.imageData);
-                            
-                            img.onload = () => {
-                                this.imgs = [img];
-                                this.applyFlareTypeSettings("50MM_PRIME");
-                                if (this.graph && app.graph?.canvas) {
-                                this.setDirtyCanvas(true);
-                                }
-                            };
-                            
-                            img.onerror = () => {
-                                console.error("Preview image load error");
-                            };
-                            
-                            img.src = url;
-                        }
-                    } else {
-                        this.imgs = [];
-                        if (this.graph && app.graph?.canvas) {
+        nodeType.prototype._handleConnectionsChange = function() {
+            const inputLink = this.getInputLink(0);
+            if (inputLink) {
+                const inputNode = this.graph.getNodeById(inputLink.origin_id);
+                if (inputNode) {
+                    if (inputNode.imgs && inputNode.imgs.length > 0) {
+                        this.currentImage = inputNode.imgs[0];
+                        this._initializeDefaultSettingsIfNeeded();
                         this.setDirtyCanvas(true);
-                        }
+                    } else if (inputNode.imageData) {
+                        const img = new Image();
+                        img.onload = () => {
+                            this.currentImage = img;
+                            this._initializeDefaultSettingsIfNeeded();
+                            this.setDirtyCanvas(true);
+                        };
+                        img.onerror = () => console.error("Preview image load error");
+                        img.src = UI_HELPERS.imageDataToUrl(inputNode.imageData);
                     }
                 }
+            } else {
+                this.currentImage = null;
+                this.imgs = [];
+                this.setDirtyCanvas(true);
+            }
+        };
+
+        
+        nodeType.prototype._initializeDefaultSettingsIfNeeded = function() {
+            if (!this.properties.position_x) {
+                this.properties.position_x = 0.5;
+                this.properties.position_y = 0.5;
+                this.properties.size = 1.0;
+                this.properties.intensity = 1.0;
+                this.properties.rotation = 0;
+                this.properties.blend_mode = 'screen';
             }
         };
 
         this.onPropertyChanged = function(property, value) {
-"   "
-            if (property === 'ghost_color' || property === 'secondary_color') {
-                ;
+            
+            this.properties[property] = value;
+            
+            
+            if (this.widgets) {
+                const widget = this.widgets.find(w => w.name === property);
+                if (widget) {
+                    widget.value = value;
+                }
             }
-            if (property in this.properties) {
-                this.properties[property] = value;
+            
+            
+            if (property.endsWith('_color')) {
+                this._cachedCanvas = null;
+                this._lastRenderConfig = null;
+            }
+            
+            
+            this.setDirtyCanvas(true);
+            if (this.graph) {
+                this.graph.setDirtyCanvas(true, true);
+                requestAnimationFrame(() => {
+                    this.graph.runStep();
+                    this.graph.change();
+                });
+            }
+        };
+
+        nodeType.prototype.setupColorPicker = function(dialog, pickerType, defaultColor) {
+            const colorPicker = dialog.querySelector(`#${pickerType}ColorPicker`);
+            if (colorPicker) {
                 
-                if (property === 'flare_type') {
-                    const config = DEFAULT_FLARE_CONFIGS[value];
-                    if (config) {
-                        this.mainColor = {...config.mainColor};
-                        this.secondaryColor = {...config.secondaryColor};
-
-                        this.properties.main_color = [this.mainColor.r, this.mainColor.g, this.mainColor.b];
-                        this.properties.ghost_color = [
-                            config.ghostColor.r,
-                            config.ghostColor.g,
-                            config.ghostColor.b
-                        ];
-
-                        this.properties.starburst_color = [this.mainColor.r, this.mainColor.g, this.mainColor.b];
-
-                        this.ghostCount = config.ghostCount;
-                        this.ghostSpacing = config.ghostSpacing;
-                        this.ghostSizes = config.ghostSizes;
-                        this.ghostOpacities = config.ghostOpacities;
-                        this.anamorphicStretch = config.anamorphicStretch;
-
-                        if (config.defaultSettings) {
-                            Object.entries(config.defaultSettings).forEach(([key, defaultValue]) => {
-                                this.properties[key] = defaultValue;
-                                this._updateWidgetValue(key, defaultValue);
-                                
-                                if (this.dialog && this.dialog.isOpen) {
-                                    this._updateSliderUI(`${key}Slider`, defaultValue, SLIDER_RANGES[key] || { min: 0, max: 1 });
-                                    const valueDisplay = document.querySelector(`#${key}Value`);
-                                    if (valueDisplay) {
-                                        valueDisplay.textContent = this.formatSliderValue(key, defaultValue);
-                                    }
-                                }
-                            });
-                        }
+                const rgbArray = this.properties[pickerType + '_color'] || defaultColor;
+                const hexColor = '#' + rgbArray.map(c => {
+                    const hex = Math.round(c).toString(16);
+                    return hex.length === 1 ? '0' + hex : hex;
+                }).join('');
+                
+                colorPicker.value = hexColor;
+                
+                colorPicker.addEventListener('input', (e) => {
+                    const color = e.target.value;
+                    const r = parseInt(color.substr(1,2), 16);
+                    const g = parseInt(color.substr(3,2), 16);
+                    const b = parseInt(color.substr(5,2), 16);
+                    
+                    
+                    this.properties[pickerType + '_color'] = [r, g, b];
+                    
+                    
+                    const widget = this.widgets?.find(w => w.name === pickerType + '_color');
+                    if (widget) {
+                        widget.value = [r, g, b];
                     }
-
-
-                }
-            };
-
-            this.updateSliderValue = function(x, sliderKey) {
-                const bounds = this.sliderBounds[sliderKey];
-                if (!bounds) return;
-
-                const progress = Math.max(0, Math.min(1, (x - bounds.x) / bounds.width));
-                const range = SLIDER_RANGES[sliderKey.toLowerCase().replace(/\s+/g, '_')];
-                
-                if (!range) return;
-
-                const value = range.min + (range.max - range.min) * progress;
-                const propertyKey = sliderKey.toLowerCase().replace(/\s+/g, '_');
-                
-                this.properties[propertyKey] = value;
-                this._updateSliderUI(`${propertyKey}Slider`, value, range);
-                
-                const valueDisplay = document.querySelector(`#${propertyKey}Value`);
-                if (valueDisplay) {
-                    valueDisplay.textContent = this.formatSliderValue(propertyKey, value);
-                }
-
-                this.setDirtyCanvas(true);
-            };
-
-            this.properties.starburst_color = [255, 255, 255];
-            this.properties.ghost_color = [255, 255, 255];
-
-            nodeType.prototype.drawGhost = function(ctx, params) {
-                const { x, y, size, opacity, angle } = params;
-                
-                ctx.save();
-                ctx.translate(x, y);
-                ctx.rotate(angle);
-
-                const ghostGlow = ctx.createRadialGradient(0, 0, 0, 0, 0, size);
-                
-
-                const ghostColor = this.properties.ghost_color || [255, 255, 255];
-                ghostGlow.addColorStop(0, `rgba(${ghostColor[0]},${ghostColor[1]},${ghostColor[2]},${opacity})`);
-                ghostGlow.addColorStop(0.5, `rgba(${ghostColor[0]},${ghostColor[1]},${ghostColor[2]},${opacity * 0.7})`);
-                ghostGlow.addColorStop(1, 'rgba(0,0,0,0)');
-
-
-                ctx.scale(1.2, 1.0);
-                ctx.fillStyle = ghostGlow;
-                ctx.beginPath();
-                ctx.arc(0, 0, size, 0, Math.PI * 2);
-                ctx.fill();
-                
-                ctx.restore();
-            };
-
-            nodeType.prototype.updateColorPickers = function(dialog, mainColor, secondaryColor) {
-                const mainColorPicker = dialog.querySelector('#mainColorPicker');
-                const secondaryColorPicker = dialog.querySelector('#secondaryColorPicker');
-                const starburstColorPicker = dialog.querySelector('#starburstColorPicker');
-                const ghostColorPicker = dialog.querySelector('#ghostColorPicker');
-
-                if (mainColorPicker) {
-                    const mainHex = this.rgbToHex(mainColor);
-                    mainColorPicker.value = mainHex;
-                    mainColorPicker.nextElementSibling.textContent = mainHex.toUpperCase();
-                }
-                
-                if (secondaryColorPicker) {
-                    const secondaryHex = this.rgbToHex(secondaryColor);
-                    secondaryColorPicker.value = secondaryHex;
-                    secondaryColorPicker.nextElementSibling.textContent = secondaryHex.toUpperCase();
-                }
-
-
-                if (starburstColorPicker && this.properties.starburst_color) {
-                    const starburstHex = this.rgbToHex({
-                        r: this.properties.starburst_color[0],
-                        g: this.properties.starburst_color[1],
-                        b: this.properties.starburst_color[2]
-                    });
-                    starburstColorPicker.value = starburstHex;
-                    starburstColorPicker.nextElementSibling.textContent = starburstHex.toUpperCase();
-                }
-                
-                if (ghostColorPicker && this.properties.ghost_color) {
-                    const ghostHex = this.rgbToHex({
-                        r: this.properties.ghost_color[0],
-                        g: this.properties.ghost_color[1],
-                        b: this.properties.ghost_color[2]
-                    });
-                    ghostColorPicker.value = ghostHex;
-                    ghostColorPicker.nextElementSibling.textContent = ghostHex.toUpperCase();
-                }
-            };
-
-            return r;
+                    
+                    
+                    const hexDisplay = e.target.nextElementSibling;
+                    if (hexDisplay) {
+                        hexDisplay.textContent = color.toUpperCase();
+                    }
+                    
+                    
+                    this._cachedCanvas = null;
+                    this._lastRenderConfig = null;
+                    this.setDirtyCanvas(true);
+                    
+                    
+                    if (this.graph) {
+                        this.graph.setDirtyCanvas(true, true);
+                        requestAnimationFrame(() => {
+                            this.graph.runStep();
+                            this.graph.change();
+                        });
+                    }
+                });
+            }
         };
 
         nodeType.prototype.onExecuted = function(message) {
-            if (message?.image) {
-                const img = new Image();
-                const url = imageDataToUrl(message.image);
+            if (message?.imgs && message.imgs.length > 0) {
+                this.currentImage = message.imgs[0];
                 
-                img.onload = () => {
-                    this.imgs = [img];
-                    this.setDirtyCanvas(true);
-                };
+                this._cachedCanvas = null;
+                this._lastRenderConfig = null;
+                this.setDirtyCanvas(true);
                 
-                img.onerror = () => {
-                    console.error("Image load error");
-                };
                 
-                img.src = url;
+                if (this.widgets) {
+                    this.widgets.forEach(w => {
+                        if (w.name in this.properties) {
+                            w.value = this.properties[w.name];
+                        }
+                    });
+                }
+
+                
+                requestAnimationFrame(() => {
+                    if (this.graph) {
+                        this.graph.setDirtyCanvas(true, true);
+                        this.graph.runStep();
+                        this.graph.change();
+                    }
+                });
             }
         };
 
         nodeType.prototype.onDrawForeground = function(ctx) {
             if (this.flags.collapsed) return;
 
-
-            this.drawHeader(ctx);
             this.drawPreviewArea(ctx);
             this.drawEditButton(ctx);
 
@@ -407,7 +407,7 @@ app.registerExtension({
 
         nodeType.prototype.onMouseDown = function(e, local_pos) {
 
-            if (this.editButtonBounds && isInBounds(local_pos[0], local_pos[1], this.editButtonBounds)) {
+            if (this.editButtonBounds && UI_HELPERS.isInBounds(local_pos[0], local_pos[1], this.editButtonBounds)) {
                 this.openFlareDialog();
                 return true;
             }
@@ -425,7 +425,7 @@ app.registerExtension({
 
                 categories.forEach((category, index) => {
                     const categoryY = startY + (index * 50);
-                    if (isInBounds(local_pos[0], local_pos[1], {
+                    if (UI_HELPERS.isInBounds(local_pos[0], local_pos[1], {
                         x: categoryX,
                         y: categoryY,
                         width: categoryWidth,
@@ -449,30 +449,23 @@ app.registerExtension({
                 );
 
                 if (distance <= this.refreshButtonBounds.radius) {
-                    this.setDirtyCanvas(true);
-                    
                     const inputLink = this.getInputLink(0);
                     if (inputLink) {
                         const inputNode = this.graph.getNodeById(inputLink.origin_id);
                         if (inputNode) {
                             if (inputNode.imgs && inputNode.imgs.length > 0) {
-                                this.imgs = [inputNode.imgs[0]];
-                                this.applyFlareTypeSettings("50MM_PRIME");
+                                this.currentImage = inputNode.imgs[0];
+                                this._initializeDefaultSettingsIfNeeded();
+                                this.setDirtyCanvas(true);
                             } else if (inputNode.imageData) {
                                 const img = new Image();
-                                const url = imageDataToUrl(inputNode.imageData);
-                                
                                 img.onload = () => {
-                                    this.imgs = [img];
-                                    this.applyFlareTypeSettings(this.current_flare_type || "50MM_PRIME");
+                                    this.currentImage = img;
+                                    this._initializeDefaultSettingsIfNeeded();
                                     this.setDirtyCanvas(true);
                                 };
-                                
-                                img.onerror = () => {
-                                    console.error("Preview image load error");
-                                };
-                                
-                                img.src = url;
+                                img.onerror = () => console.error("Preview image load error");
+                                img.src = UI_HELPERS.imageDataToUrl(inputNode.imageData);
                             }
                         }
                     }
@@ -499,29 +492,12 @@ app.registerExtension({
 
 
                 const intensitySlider = { x: x + 20, y: y + 60, width: 360, height: 30 };
-                if (isInBounds(local_pos[0], local_pos[1], intensitySlider)) {
+                if (UI_HELPERS.isInBounds(local_pos[0], local_pos[1], intensitySlider)) {
                     this.activeSlider = "intensity";
                     return true;
                 }
 
 
-            }
-
-            return false;
-        };
-
-
-        nodeType.prototype.onMouseMove = function(e, local_pos) {
-            if (this.dialog.isOpen && this.activeSlider) {
-                const dialog = this.dialog;
-                const slider = this.getSliderByKey(this.activeSlider);
-                if (slider) {
-                    const progress = (local_pos[0] - (dialog.position.x + 20)) / 360;
-                    const value = Math.max(slider.min, Math.min(slider.max, slider.min + (slider.max - slider.min) * progress));
-                    this.properties[slider.key] = value;
-                    this.setDirtyCanvas(true);
-                    return true;
-                }
             }
 
             return false;
@@ -592,14 +568,13 @@ app.registerExtension({
 
         nodeType.prototype.prepareOffscreenCanvas = function(ctx) {
             const scale = 4;
-            const offscreen = new OffscreenCanvas(
-                ctx.canvas.width * scale, 
-                ctx.canvas.height * scale
-            );
+            
+            const offscreen = document.createElement('canvas');
+            offscreen.width = ctx.canvas.width * scale;
+            offscreen.height = ctx.canvas.height * scale;
             const offCtx = offscreen.getContext('2d', {
                 alpha: true,
-                willReadFrequently: false,
-                desynchronized: true
+                willReadFrequently: false
             });
             
             return { offCtx, offscreen, scale };
@@ -848,13 +823,12 @@ app.registerExtension({
             ctx.rotate(angle);
 
             const ghostGlow = ctx.createRadialGradient(0, 0, 0, 0, 0, size);
-            
 
             const ghostColor = this.properties.ghost_color || [255, 255, 255];
-            ghostGlow.addColorStop(0, `rgba(${ghostColor[0]},${ghostColor[1]},${ghostColor[2]},${opacity})`);
-            ghostGlow.addColorStop(0.5, `rgba(${ghostColor[0]},${ghostColor[1]},${ghostColor[2]},${opacity * 0.7})`);
+            
+            ghostGlow.addColorStop(0, FORMAT_HELPERS.createColorString(ghostColor, opacity));
+            ghostGlow.addColorStop(0.5, FORMAT_HELPERS.createColorString(ghostColor, opacity * 0.7));
             ghostGlow.addColorStop(1, 'rgba(0,0,0,0)');
-
 
             ctx.scale(1.2, 1.0);
             ctx.fillStyle = ghostGlow;
@@ -869,36 +843,55 @@ app.registerExtension({
         nodeType.prototype.drawDust = function(ctx, params) {
             const { centerX, centerY, radius, opacity, color, density } = params;
             
-
             if (!isFinite(centerX) || !isFinite(centerY) || !isFinite(radius)) {
-                console.warn('Invalid coordinates for dust effect:', { centerX, centerY, radius });
                 return;
             }
 
             const safeRadius = Math.min(Math.abs(radius), 1000);
             const safeDensity = Math.min(Math.floor(density), 50);
             
-            for (let i = 0; i < safeDensity; i++) {
-                try {
-                    const angle = Math.random() * Math.PI * 2;
-                    const distance = Math.random() * safeRadius;
-                    const size = Math.random() * safeRadius * 0.2;
+            
+            const dustKey = `${Math.round(centerX)}_${Math.round(centerY)}_${Math.round(safeRadius)}_${safeDensity}`;
+            
+            
+            if (!this._staticDustParticles[dustKey]) {
+                this._staticDustParticles[dustKey] = [];
+                
+                for (let i = 0; i < safeDensity; i++) {
                     
-
-                    const x = Math.max(-10000, Math.min(10000, centerX + Math.cos(angle) * distance));
-                    const y = Math.max(-10000, Math.min(10000, centerY + Math.sin(angle) * distance));
+                    const seed = i / safeDensity; 
+                    const angleInDegrees = seed * 360; 
                     
-
-                    const safeSize = Math.max(0.1, Math.min(100, size));
-
-                    if (!isFinite(x) || !isFinite(y) || !isFinite(safeSize)) {
-                        continue;
+                    
+                    const { x: offsetX, y: offsetY } = VECTOR_UTILS.polarToCartesian(
+                        (seed * 0.8 + 0.2) * safeRadius, 
+                        angleInDegrees
+                    );
+                    
+                    const x = Math.max(-10000, Math.min(10000, centerX + offsetX));
+                    const y = Math.max(-10000, Math.min(10000, centerY + offsetY));
+                    const safeSize = Math.max(0.1, Math.min(100, (seed * 0.5 + 0.5) * safeRadius * 0.2)); 
+                    
+                    if (isFinite(x) && isFinite(y) && isFinite(safeSize)) {
+                        
+                        this._staticDustParticles[dustKey].push({
+                            x, y, size: safeSize, 
+                            opacityFactor: 0.3 + (seed * 0.7) 
+                        });
                     }
-
-                    const dustGlow = ctx.createRadialGradient(x, y, 0, x, y, safeSize);
+                }
+            }
+            
+            
+            this._staticDustParticles[dustKey].forEach(particle => {
+                try {
+                    const dustGlow = ctx.createRadialGradient(
+                        particle.x, particle.y, 0, 
+                        particle.x, particle.y, particle.size
+                    );
                     
                     if (color === 'white') {
-                        const safeOpacity = Math.min(1, Math.max(0, opacity * (0.3 + Math.random() * 0.7)));
+                        const safeOpacity = Math.min(1, Math.max(0, opacity * particle.opacityFactor));
                         dustGlow.addColorStop(0, `rgba(255,255,255,${safeOpacity})`);
                     } else {
                         const colorValues = {
@@ -907,21 +900,20 @@ app.registerExtension({
                             blue: [50, 50, 255]
                         };
                         const [r, g, b] = colorValues[color] || [255, 255, 255];
-                        const safeOpacity = Math.min(1, Math.max(0, opacity * (0.3 + Math.random() * 0.7)));
-                        dustGlow.addColorStop(0, `rgba(${r},${g},${b},${safeOpacity})`);
+                        const safeOpacity = Math.min(1, Math.max(0, opacity * particle.opacityFactor));
+                        dustGlow.addColorStop(0, FORMAT_HELPERS.createColorString([r, g, b], safeOpacity));
                     }
                     
                     dustGlow.addColorStop(1, 'rgba(0,0,0,0)');
 
                     ctx.fillStyle = dustGlow;
                     ctx.beginPath();
-                    ctx.arc(x, y, safeSize, 0, Math.PI * 2);
+                    ctx.arc(particle.x, particle.y, particle.size, 0, Math.PI * 2);
                     ctx.fill();
                 } catch (error) {
-                    console.warn('Error drawing dust particle:', error);
-                    continue;
+                    
                 }
-            }
+            });
         };
 
 
@@ -1032,35 +1024,70 @@ app.registerExtension({
 
 
         nodeType.prototype.createMainLayers = function(config, radius, intensity, characteristics) {
-            const MC = RENDER_CONSTANTS.MAIN_GLOW;
-            const CC = RENDER_CONSTANTS.COATING;
+            const { inner_glow, outer_glow } = this.properties;
+            const mainColor = this.properties.main_color || [255, 255, 255];
             
-            return [
-                {
+            
+            const layers = [];
+            
+            
+            const innerCore = {
                     blend: 'screen',
-                    render: (ctx) => this.createMainGlow(ctx, {
-                        radius,
-                        intensity,
-                        config,
-                        tempAdjust: (this.properties.color_temperature - MC.TEMPERATURE_ADJUSTMENT.BASE) / MC.TEMPERATURE_ADJUSTMENT.SCALE,
-                        stops: MC.OPACITY_STOPS
-                    })
-                },
-                {
-                    blend: 'screen',
-                    render: (ctx) => this.createInnerRing(ctx, radius, intensity)
-                },
-                {
-                    blend: 'overlay',
-                    render: (ctx) => this.createCoatingReflection(ctx, {
-                        radius,
-                        intensity,
-                        config,
-                        coatingQuality: characteristics.coatingQuality,
-                        colorBlend: CC.COLOR_BLEND
-                    })
+                render: (ctx) => {
+                    const gradient = ctx.createRadialGradient(0, 0, 0, 0, 0, radius * 0.8);
+                    gradient.addColorStop(0, FORMAT_HELPERS.createColorString(mainColor, intensity));
+                    gradient.addColorStop(0.6, FORMAT_HELPERS.createColorString(mainColor, intensity * 0.7));
+                    gradient.addColorStop(1, 'rgba(0,0,0,0)');
+                    
+                    ctx.fillStyle = gradient;
+                    ctx.beginPath();
+                    ctx.arc(0, 0, radius * 0.8, 0, Math.PI * 2);
+                    ctx.fill();
                 }
-            ];
+            };
+            
+            layers.push(innerCore);
+            
+            
+            if (outer_glow > 0) {
+                const outerGlow = {
+                    blend: 'screen',
+                    render: (ctx) => {
+                        const gradient = ctx.createRadialGradient(0, 0, 0, 0, 0, radius * 1.5);
+                        gradient.addColorStop(0, FORMAT_HELPERS.createColorString(mainColor, intensity * 0.8 * outer_glow));
+                        gradient.addColorStop(0.5, FORMAT_HELPERS.createColorString(mainColor, intensity * 0.4 * outer_glow));
+                        gradient.addColorStop(1, 'rgba(0,0,0,0)');
+                        
+                        ctx.fillStyle = gradient;
+                        ctx.beginPath();
+                        ctx.arc(0, 0, radius * 1.5, 0, Math.PI * 2);
+                        ctx.fill();
+                    }
+                };
+                
+                layers.push(outerGlow);
+            }
+            
+            
+            if (inner_glow > 0) {
+                const innerHighlight = {
+                    blend: 'screen',
+                    render: (ctx) => {
+                        const gradient = ctx.createRadialGradient(0, 0, 0, 0, 0, radius * 0.5);
+                        gradient.addColorStop(0, FORMAT_HELPERS.createColorString(mainColor, intensity * inner_glow));
+                        gradient.addColorStop(1, 'rgba(0,0,0,0)');
+                        
+                        ctx.fillStyle = gradient;
+                        ctx.beginPath();
+                        ctx.arc(0, 0, radius * 0.5, 0, Math.PI * 2);
+                        ctx.fill();
+                    }
+                };
+                
+                layers.push(innerHighlight);
+            }
+            
+            return layers;
         };
 
 
@@ -1173,12 +1200,14 @@ app.registerExtension({
             for (let i = 0; i < settings.raysPerGroup; i++) {
                 const angle = (i / settings.raysPerGroup) * Math.PI * 2 + rotation;
                 const rayOpacity = settings.baseIntensity * intensity * 0.5;
-                const rayLength = radius * settings.rayLength * (0.8 + Math.random() * 0.4);
+                
+                
+                const variationFactor = 0.8 + ((i % 5) / 5) * 0.4; 
+                const rayLength = radius * settings.rayLength * variationFactor;
                 
                 ctx.save();
                 ctx.rotate(angle);
                 
-
                 this.drawMainRay(ctx, rayLength, rayOpacity, config);
                 this.drawDetailRays(ctx, rayLength, rayOpacity, config);
                 this.drawGlowLayer(ctx, rayLength, rayOpacity, config);
@@ -1258,221 +1287,302 @@ app.registerExtension({
 
 
         nodeType.prototype.drawPreviewArea = function(ctx) {
-            const { PADDING, HEADER_HEIGHT, PREVIEW_HEIGHT } = this.UI_CONSTANTS;
-            const previewWidth = this.size[0] - (PADDING * 2);
-                const previewArea = {
-                    x: PADDING,
-                    y: HEADER_HEIGHT + PADDING,
-                width: previewWidth,
-                    height: PREVIEW_HEIGHT
-                };
+            if (!this.currentImage || !this.size || this.size[1] <= 0) return;
+
+            const { PADDING, HEADER_HEIGHT } = this.UI_CONSTANTS;
+            const buttonHeight = 40; 
             
+            const previewArea = {
+                x: PADDING,
+                y: HEADER_HEIGHT + PADDING,
+                width: this.size[0] - 2 * PADDING,
+                height: this.size[1] - HEADER_HEIGHT - (3 * PADDING) - buttonHeight
+            };
 
-            ctx.fillStyle = "#1a1a1a";
+            if (previewArea.height <= 0) return;
+
+            const imageAspect = this.currentImage.width / this.currentImage.height;
+            const previewAspect = previewArea.width / previewArea.height;
+            
+            let drawWidth, drawHeight, offsetX, offsetY;
+
+            if (imageAspect > previewAspect) {
+                drawWidth = previewArea.width;
+                drawHeight = previewArea.width / imageAspect;
+                offsetX = previewArea.x;
+                offsetY = previewArea.y + (previewArea.height - drawHeight) / 2;
+            } else {
+                drawHeight = previewArea.height;
+                drawWidth = previewArea.height * imageAspect;
+                offsetX = previewArea.x + (previewArea.width - drawWidth) / 2;
+                offsetY = previewArea.y;
+            }
+
+            const currentConfig = {
+                width: drawWidth,
+                height: drawHeight,
+                position_x: this.properties.position_x,
+                position_y: this.properties.position_y,
+                size: this.properties.size,
+                intensity: this.properties.intensity,
+                rotation: this.properties.rotation,
+                blend_mode: this.properties.blend_mode
+            };
+
+            if (this._cachedCanvas && this._lastRenderConfig && 
+                JSON.stringify(currentConfig) === JSON.stringify(this._lastRenderConfig)) {
+                ctx.drawImage(this._cachedCanvas, offsetX, offsetY, drawWidth, drawHeight);
+                return;
+            }
+
+            if (!this._cachedCanvas) {
+                this._cachedCanvas = document.createElement('canvas');
+            }
+            
+            this._cachedCanvas.width = this.currentImage.width;
+            this._cachedCanvas.height = this.currentImage.height;
+            
+            const offCtx = this._cachedCanvas.getContext('2d', {
+                alpha: true,
+                willReadFrequently: false,
+                desynchronized: true
+            });
+
+            this.renderToContext(offCtx, {
+                ...currentConfig,
+                width: this.currentImage.width,
+                height: this.currentImage.height
+            });
+
+            this._lastRenderConfig = currentConfig;
+
+            ctx.save();
             ctx.beginPath();
-            ctx.roundRect(previewArea.x, previewArea.y, previewArea.width, previewArea.height, 8);
-            ctx.fill();
+            ctx.rect(previewArea.x, previewArea.y, previewArea.width, previewArea.height);
+            ctx.clip();
+            ctx.drawImage(this._cachedCanvas, offsetX, offsetY, drawWidth, drawHeight);
+            ctx.restore();
 
-
-            ctx.strokeStyle = "rgba(255,255,255,0.1)";
-            ctx.lineWidth = 1;
-            ctx.stroke();
-
-
-            if (this.imgs[0]?.complete) {
-                const img = this.imgs[0];
-                
-
-                const currentImageKey = img.src + JSON.stringify(this.properties);
-                if (this._lastImageKey === currentImageKey && this._cachedPreview) {
-                    ctx.drawImage(this._cachedPreview, 
-                        previewArea.x, 
-                        previewArea.y, 
-                        previewArea.width, 
-                        previewArea.height);
-                    return;
-                }
-
-
-                if (!this.offscreenCanvas) {
-                    this.offscreenCanvas = document.createElement('canvas');
-                }
-                this.offscreenCanvas.width = img.width;
-                this.offscreenCanvas.height = img.height;
-                const offCtx = this.offscreenCanvas.getContext('2d', {
-                    alpha: true,
-                    willReadFrequently: true,
-                    imageSmoothingEnabled: true,
-                    imageSmoothingQuality: 'high'
-                });
-                
-
-                offCtx.drawImage(img, 0, 0);
-
-
-                const scale = Math.min(
-                    (previewArea.width - PADDING * 2) / img.width,
-                    (previewArea.height - PADDING * 2) / img.height
-                );
-
-                const displayWidth = img.width * scale;
-                const displayHeight = img.height * scale;
-
-
-                const x = previewArea.x + (previewArea.width - displayWidth) / 2;
-                const y = previewArea.y + (previewArea.height - displayHeight) / 2;
-
-
-                const centerX = img.width * this.properties.position_x;
-                const centerY = img.height * this.properties.position_y;
-                const flareSize = this.properties.size * Math.min(img.width, img.height) * 0.5;
-                const intensity = this.properties.intensity;
-                const rotation = this.properties.rotation * Math.PI / 180;
-
-
-                const tempCanvas = document.createElement('canvas');
-                tempCanvas.width = img.width;
-                tempCanvas.height = img.height;
-                const tempCtx = tempCanvas.getContext('2d', {
-                    alpha: true,
-                    willReadFrequently: true
-                });
-
-
-                tempCtx.save();
-                this.renderAdvancedFlare(tempCtx, centerX, centerY, flareSize, intensity, rotation);
-                tempCtx.restore();
-
-
-                offCtx.globalCompositeOperation = this.properties.blend_mode;
-                offCtx.drawImage(tempCanvas, 0, 0);
-                offCtx.globalCompositeOperation = 'source-over';
-
-
-                if (!this._cachedPreview) {
-                    this._cachedPreview = document.createElement('canvas');
-                }
-                this._cachedPreview.width = previewArea.width;
-                this._cachedPreview.height = previewArea.height;
-                const cacheCtx = this._cachedPreview.getContext('2d', {
-                    alpha: true,
-                    willReadFrequently: true,
-                    imageSmoothingEnabled: true,
-                    imageSmoothingQuality: 'high'
-                });
-
-
-                cacheCtx.fillStyle = "#1a1a1a";
-                cacheCtx.fillRect(0, 0, previewArea.width, previewArea.height);
-                cacheCtx.drawImage(this.offscreenCanvas, 
-                    0, 0, img.width, img.height,
-                    x - previewArea.x, y - previewArea.y, displayWidth, displayHeight
-                );
-
-
-                ctx.drawImage(this._cachedPreview, 
-                    0, 0, previewArea.width, previewArea.height,
-                    previewArea.x, previewArea.y, previewArea.width, previewArea.height
-                );
-
-                this._lastImageKey = currentImageKey;
-                
-
-                const base64Image = this.offscreenCanvas.toDataURL('image/png');
-                if (this.widgets) {
-                    const canvasWidget = this.widgets.find(w => w.name === 'canvas_image');
-                    if (canvasWidget) {
-                        canvasWidget.value = base64Image;
+            
+            if (this.widgets) {
+                const canvasImageWidget = this.widgets.find(w => w.name === 'canvas_image');
+                if (canvasImageWidget) {
+                    const base64Image = this.optimizeBase64Image(this._cachedCanvas);
+                    if (base64Image) {
+                        canvasImageWidget.value = base64Image;
                     }
                 }
 
+                
+                this.widgets.forEach(w => {
+                    if (w.name !== 'canvas_image' && w.name in this.properties) {
+                        w.value = this.properties[w.name];
+                    }
+                });
 
-                tempCanvas.remove();
+                if (this.graph) {
+                    this.graph.change();
+                }
             }
         };
 
+        
+        nodeType.prototype.renderToContext = function(ctx, config) {
+            if (!this.currentImage) return;
+
+            
+            ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+            
+            
+            ctx.drawImage(this.currentImage, 0, 0, ctx.canvas.width, ctx.canvas.height);
+
+            
+            const imageWidth = ctx.canvas.width;
+            const imageHeight = ctx.canvas.height;
+            const maxDimension = Math.max(imageWidth, imageHeight);
+
+            
+            const centerX = imageWidth * config.position_x;
+            const centerY = imageHeight * config.position_y;
+            
+            
+            const flareSize = config.size * (maxDimension * 0.5);
+            const rotation = config.rotation * Math.PI / 180;
+
+            
+            const tempCanvas = document.createElement('canvas');
+            const scale = Math.min(1, Math.max(0.5, 2048 / maxDimension));
+            tempCanvas.width = imageWidth * scale;
+            tempCanvas.height = imageHeight * scale;
+            
+            const tempCtx = tempCanvas.getContext('2d', {
+                alpha: true,
+                willReadFrequently: false,
+                desynchronized: true
+            });
+
+            
+            tempCtx.save();
+            tempCtx.scale(scale, scale);
+            this.renderAdvancedFlare(
+                tempCtx, 
+                centerX * scale,
+                centerY * scale,
+                flareSize * scale,
+                config.intensity,
+                rotation
+            );
+            tempCtx.restore();
+
+            
+            ctx.globalCompositeOperation = config.blend_mode || 'screen';
+            ctx.drawImage(tempCanvas, 0, 0, imageWidth, imageHeight);
+            ctx.globalCompositeOperation = 'source-over';
+
+            
+            tempCanvas.remove();
+        };
+
+        
+        nodeType.prototype.updateCanvasAndGraph = function() {
+            
+            this._cachedCanvas = null;
+            this._lastRenderConfig = null;
+
+            
+            this.setDirtyCanvas(true);
+            
+            if (this.graph) {
+                this.graph.setDirtyCanvas(true, true);
+                
+                
+                if (this.widgets) {
+                    this.widgets.forEach(w => {
+                        if (w.name in this.properties) {
+                            w.value = this.properties[w.name];
+                        }
+                    });
+                }
+                
+                
+                requestAnimationFrame(() => {
+                    this.graph.runStep();
+                    this.graph.change();
+                });
+            }
+        };
 
         nodeType.prototype.drawEditButton = function(ctx) {
-            const { PADDING, HEADER_HEIGHT, PREVIEW_HEIGHT } = this.UI_CONSTANTS;
-            const buttonWidth = 120;
-            const buttonHeight = 34;
-            const x = this.size[0] - buttonWidth - PADDING;
-            const y = HEADER_HEIGHT + PREVIEW_HEIGHT + PADDING * 1.5;
-
-
-            const refreshButtonSize = 28;
-            const refreshButtonX = x - refreshButtonSize - 10;
-            const refreshButtonY = y + (buttonHeight - refreshButtonSize) / 2;
+            const { PADDING, HEADER_HEIGHT } = this.UI_CONSTANTS;
             
-
-            ctx.fillStyle = "rgba(255,255,255,0.05)";
+            
+            
+            const editButtonWidth = 80;
+            const buttonHeight = 30;
+            const buttonSpacing = 10;
+            const iconSize = 16;
+            
+            
+            const bottomPadding = 12;
+            const y = this.size[1] - buttonHeight - bottomPadding;
+            
+            
+            
+            const refreshX = PADDING + 8;
+            const refreshY = y;
+            
+            
+            ctx.save();
+            
+            
+            ctx.fillStyle = "rgba(255,255,255,0.03)";
             ctx.beginPath();
-            ctx.roundRect(refreshButtonX, refreshButtonY, refreshButtonSize, refreshButtonSize, 6);
+            ctx.arc(refreshX + iconSize/2, refreshY + buttonHeight/2, iconSize/2 + 4, 0, Math.PI * 2);
             ctx.fill();
             
-
-            ctx.save();
-            ctx.strokeStyle = "#ddd";
-            ctx.lineWidth = 2;
             
-
-            const centerX = refreshButtonX + refreshButtonSize/2;
-            const centerY = refreshButtonY + refreshButtonSize/2;
+            ctx.strokeStyle = "rgba(255,255,255,0.5)";
+            ctx.lineWidth = 1.5;
             
-
+            
             ctx.beginPath();
-            ctx.arc(centerX, centerY, 8, 0, 1.5 * Math.PI);
+            ctx.arc(refreshX + iconSize/2, refreshY + buttonHeight/2, iconSize/3, 0.3 * Math.PI, 1.8 * Math.PI);
             ctx.stroke();
             
-
+            
+            const arrowX = refreshX + iconSize/2 + Math.cos(0.3 * Math.PI) * (iconSize/3);
+            const arrowY = refreshY + buttonHeight/2 + Math.sin(0.3 * Math.PI) * (iconSize/3);
+            
             ctx.beginPath();
-            ctx.moveTo(centerX, centerY - 8);
-            ctx.lineTo(centerX - 4, centerY - 8);
-            ctx.lineTo(centerX, centerY - 12);
+            ctx.moveTo(arrowX, arrowY);
+            ctx.lineTo(arrowX - 3, arrowY - 2);
+            ctx.lineTo(arrowX - 1, arrowY + 3);
             ctx.closePath();
-            ctx.fillStyle = "#ddd";
+            ctx.fillStyle = "rgba(255,255,255,0.5)";
             ctx.fill();
             
             ctx.restore();
             
-
-            this.refreshButtonBounds = {
-                centerX: centerX,
-                centerY: centerY,
-                radius: refreshButtonSize/2
-            };
-
-
-            ctx.fillStyle = "rgba(0,0,0,0.2)";
-            ctx.beginPath();
-            ctx.roundRect(x + 2, y + 2, buttonWidth, buttonHeight, 6);
-            ctx.fill();
-
-
-            const gradient = ctx.createLinearGradient(x, y, x, y + buttonHeight);
-            gradient.addColorStop(0, "#4a9eff");
-            gradient.addColorStop(1, "#45e3ff");
             
-            ctx.fillStyle = gradient;
+            this.refreshButtonBounds = {
+                x: refreshX - iconSize/2,
+                y: refreshY,
+                width: iconSize + 8,
+                height: buttonHeight,
+                centerX: refreshX + iconSize/2,
+                centerY: refreshY + buttonHeight/2,
+                radius: iconSize/2 + 4
+            };
+            
+            
+            
+            const editX = this.size[0] - editButtonWidth - PADDING;
+            
+            ctx.save();
+            
+            
+            const isHovering = this.isPointerOver && 
+                              this.editButtonBounds && 
+                              UI_HELPERS.isInBounds(
+                                  this.graph.canvas.last_mouse[0], 
+                                  this.graph.canvas.last_mouse[1], 
+                                  this.editButtonBounds
+                              );
+            
+            
+            const normalColor = "rgba(255,255,255,0.06)";
+            const hoverColor = "rgba(255,255,255,0.12)";
+            ctx.fillStyle = isHovering ? hoverColor : normalColor;
+            
+            
             ctx.beginPath();
-            ctx.roundRect(x, y, buttonWidth, buttonHeight, 6);
+            ctx.roundRect(editX, y, editButtonWidth, buttonHeight, 4);
             ctx.fill();
-
-
-            ctx.fillStyle = "#fff";
-            ctx.font = "13px Arial";
+            
+            
+            const accentGradient = ctx.createLinearGradient(editX, y + buttonHeight - 1, editX + editButtonWidth, y + buttonHeight - 1);
+            accentGradient.addColorStop(0, "rgba(130, 170, 255, 0.2)");
+            accentGradient.addColorStop(0.5, "rgba(130, 170, 255, 0.5)");
+            accentGradient.addColorStop(1, "rgba(130, 170, 255, 0.2)");
+            
+            ctx.fillStyle = accentGradient;
+            ctx.fillRect(editX, y + buttonHeight - 1, editButtonWidth, 1);
+            
+            
+            ctx.fillStyle = "rgba(255,255,255,0.8)";
+            ctx.font = "400 11px Inter, system-ui, sans-serif";
             ctx.textAlign = "center";
-            ctx.fillText("Edit Flare", x + buttonWidth/2, y + buttonHeight/2 + 4);
-
-
-            if (this.isPointerOver) {
-                ctx.fillStyle = "rgba(255,255,255,0.1)";
-                ctx.fill();
-            }
-
-
+            ctx.textBaseline = "middle";
+            ctx.fillText("Edit Flare", editX + editButtonWidth/2, y + buttonHeight/2);
+            
+            ctx.restore();
+            
+            
             this.editButtonBounds = {
-                x, y, width: buttonWidth, height: buttonHeight
+                x: editX,
+                y: y,
+                width: editButtonWidth,
+                height: buttonHeight
             };
         };
 
@@ -1731,49 +1841,11 @@ app.registerExtension({
 
 
         nodeType.prototype.setDirtyCanvas = function(force_redraw) {
-            if (!this.graph || !app.graph?.canvas) return;
-            
-            const currentTime = performance.now();
-            
-
-            const THROTTLE_INTERVAL = 32;
-            
-            if (!force_redraw && 
-                this._lastRenderTime && 
-                (currentTime - this._lastRenderTime) < THROTTLE_INTERVAL) {
-                return;
+            if (this.graph && app?.graph?.canvas) {
+                app.graph.canvas.setDirty(true, true);
             }
-            
-
-            if (this._pendingRender) {
-                cancelAnimationFrame(this._pendingRender);
-            }
-            
-
-            this._pendingRender = setTimeout(() => {
-                this._lastRenderTime = performance.now();
-                
-
-                if (force_redraw) {
-                    requestAnimationFrame(() => {
-                        const canvas = app.graph.canvas;
-                    if (canvas) {
-                        canvas.setDirty(true, true);
-                    }
-                    this.graph.setDirtyCanvas(true, true);
-                        this._pendingRender = null;
-                    });
-                } else {
-
-                    const canvas = app.graph.canvas;
-                    if (canvas) {
-                        canvas.setDirty(true, false);
-                    }
-                    this.graph.setDirtyCanvas(true, false);
-                this._pendingRender = null;
-                }
-            }, THROTTLE_INTERVAL);
         };
+
 
 
         nodeType.prototype.openFlareDialog = function() {
@@ -1783,75 +1855,40 @@ app.registerExtension({
             }
             
             const dialog = document.createElement('div');
-            dialog.style.cssText = `
-                position: fixed;
-                top: 50%;
-                left: 50%;
-                transform: translate(-50%, -50%);
-                width: 800px;
-                height: 600px;
-                background: #1a1a1a;
-                border: 1px solid #333;
-                border-radius: 8px;
-                box-shadow: 0 8px 32px rgba(0,0,0,0.3);
-                display: flex;
-                flex-direction: column;
-                overflow: hidden;
-                z-index: 10000;
-            `;
-
+            dialog.style.cssText = UI_STYLES.DIALOG.MAIN;
 
             const header = document.createElement('div');
-            header.style.cssText = `
-                padding: 16px 20px;
-                background: linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0.02));
-                backdrop-filter: blur(12px);
-                border-bottom: 1px solid rgba(255,255,255,0.05);
-                display: flex;
-                justify-content: space-between;
-                align-items: center;
-                cursor: move;
-            `;
-
+            header.style.cssText = UI_STYLES.DIALOG.HEADER;
 
             header.innerHTML = `
-                <div style="display: flex; align-items: center; gap: 12px;">
+                <div style="display: flex; align-items: center; gap: 6px;">
                     <div style="
-                        width: 32px;
-                        height: 32px;
-                        border-radius: 8px;
-                        background: rgba(74, 158, 255, 0.1);
+                        width: 24px;
+                        height: 24px;
+                        border-radius: 5px;
+                        background: rgba(74, 158, 255, 0.08);
                         display: flex;
                         align-items: center;
                         justify-content: center;
                     ">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" style="color: #4a9eff">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" style="color: #4a9eff">
                         <circle cx="12" cy="12" r="4"></circle>
                             <path d="M12 3v2m0 14v2M3 12h2m14 0h2" opacity="0.5"></path>
                             <path d="M5.6 5.6l1.4 1.4m10 10l1.4 1.4M5.6 18.4l1.4-1.4m10-10l1.4-1.4" opacity="0.3"></path>
                     </svg>
                 </div>
                     <div>
-                        <div style="color: #fff; font-weight: 500; font-size: 14px;">Flare Settings</div>
+                        <div style="color: #fff; font-weight: 500; font-size: 12px;">Flare Settings</div>
                         <div class="flare-type-subtitle" style="
-                            color: #666;
-                            font-size: 12px;
-                            margin-top: 2px;
+                            color: #777;
+                            font-size: 10px;
+                            margin-top: 0;
                             transition: all 0.2s ease;
                         ">${FLARE_TYPES[this.properties.flare_type]}</div>
                     </div>
                 </div>
-                <div class="close-btn" style="
-                    cursor: pointer;
-                    padding: 8px;
-                    border-radius: 8px;
-                    transition: all 0.2s ease;
-                    background: rgba(255,255,255,0.05);
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                ">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" style="color: #888">
+                <div class="close-btn" style="${UI_STYLES.DIALOG.CLOSE_BUTTON}">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" style="color: #999">
                         <path d="M18 6L6 18"></path>
                         <path d="M6 6l12 12"></path>
                     </svg>
@@ -1862,10 +1899,10 @@ app.registerExtension({
             const style = document.createElement('style');
             style.textContent = `
                 .close-btn:hover {
-                    background: rgba(255,0,0,0.1);
+                    background: rgba(255, 80, 80, 0.1);
                 }
                 .close-btn:hover svg {
-                    color: #ff4444 !important;
+                    color: #ff6666 !important;
                 }
             `;
             document.head.appendChild(style);
@@ -1921,208 +1958,133 @@ app.registerExtension({
 
 
             const content = document.createElement('div');
-            content.style.cssText = UI_STYLES.DIALOG.CONTENT + '; max-height: calc(80vh - 120px); overflow-y: auto;';
+            content.style.cssText = UI_STYLES.DIALOG.CONTENT;
 
             content.innerHTML = `
-                <div style="display: flex; flex-direction: column; gap: 20px; padding: 20px;">
-                    <!-- Üst Grid - Ana Kontroller -->
-                    <div style="
-                        display: grid;
-                        grid-template-columns: repeat(3, 1fr);
-                        gap: 16px;
-                    ">
-                    <!-- Renk Kontrolleri -->
-                        <div class="control-section" style="
-                            background: rgba(0,0,0,0.2);
-                            padding: 16px;
-                            border-radius: 12px;
-                            border: 1px solid rgba(255,255,255,0.05);
-                        ">
-                            <div class="section-header" style="
-                                display: flex;
-                                align-items: center;
-                                gap: 8px;
-                                margin-bottom: 16px;
-                            ">
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" style="color: #4a9eff;">
+                <div style="${UI_STYLES.GRID.FLEX_COLUMN}">
+                    <!-- Top Controls - Restore 3-column grid -->
+                    <div style="${UI_STYLES.GRID.COLUMNS_3}">
+                        <!-- Color Controls -->
+                        <div style="${UI_STYLES.SECTION.CONTROL}">
+                            <div class="section-header" style="${UI_STYLES.SECTION.HEADER}">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" style="color: #4a9eff;">
                                     <circle cx="12" cy="12" r="10"/>
                                     <path d="M12 2v20M2 12h20"/>
                                 </svg>
-                                <span style="color: #eee; font-size: 13px; font-weight: 500;">Colors</span>
-                        </div>
-                        
-                        <!-- 2x2 Color Grid -->
-                        <div style="
-                            display: grid;
-                            grid-template-columns: repeat(2, 1fr);
-                            gap: 12px;
-                        ">
-                            <!-- Main Color -->
-                            <div class="color-input">
-                                <label style="display: block; color: #888; font-size: 11px; margin-bottom: 4px;">Main Color</label>
-                                <div style="
-                                    display: flex;
-                                    align-items: center;
-                                    background: rgba(0,0,0,0.2);
-                                    padding: 6px;
-                                    border-radius: 6px;
-                                    border: 1px solid rgba(255,255,255,0.05);
-                                ">
-                                    <input type="color" id="mainColorPicker" 
-                                        value="#${this.mainColor.r.toString(16).padStart(2,'0')}${this.mainColor.g.toString(16).padStart(2,'0')}${this.mainColor.b.toString(16).padStart(2,'0')}"
-                                        style="width: 24px; height: 24px; border: none; background: none; cursor: pointer;"
-                                    />
-                                    <div style="margin-left: 6px; font-family: monospace; color: #aaa; font-size: 10px;">
-                                        #${this.mainColor.r.toString(16).padStart(2,'0')}${this.mainColor.g.toString(16).padStart(2,'0')}${this.mainColor.b.toString(16).padStart(2,'0')}
-                                </div>
-                                </div>
+                                <span style="${UI_STYLES.SECTION.TITLE}">Colors</span>
                             </div>
-
-                            <!-- Secondary Color -->
-                            <div class="color-input">
-                                <label style="display: block; color: #888; font-size: 11px; margin-bottom: 4px;">Secondary Color</label>
-                                <div style="
-                                    display: flex;
-                                    align-items: center;
-                                    background: rgba(0,0,0,0.2);
-                                    padding: 6px;
-                                    border-radius: 6px;
-                                    border: 1px solid rgba(255,255,255,0.05);
-                                ">
-                                    <input type="color" id="secondaryColorPicker" 
-                                        value="#${this.secondaryColor.r.toString(16).padStart(2,'0')}${this.secondaryColor.g.toString(16).padStart(2,'0')}${this.secondaryColor.b.toString(16).padStart(2,'0')}"
-                                        style="width: 24px; height: 24px; border: none; background: none; cursor: pointer;"
-                                    />
-                                    <div style="margin-left: 6px; font-family: monospace; color: #aaa; font-size: 10px;">
-                                        #${this.secondaryColor.r.toString(16).padStart(2,'0')}${this.secondaryColor.g.toString(16).padStart(2,'0')}${this.secondaryColor.b.toString(16).padStart(2,'0')}
+                            
+                            <!-- Color Grid -->
+                            <div style="${UI_STYLES.GRID.COLUMNS_2}">
+                                <!-- Main Color -->
+                                <div class="color-input">
+                                    <label style="${UI_STYLES.COLOR.LABEL}">Main Color</label>
+                                    <div style="${UI_STYLES.COLOR.INPUT_CONTAINER}">
+                                        <input type="color" id="mainColorPicker"
+                                            value="${this.rgbToHex({ r: this.properties.main_color[0], g: this.properties.main_color[1], b: this.properties.main_color[2] })}"
+                                            style="${UI_STYLES.COLOR.INPUT}"
+                                        />
+                                        <div style="${UI_STYLES.COLOR.HEX_DISPLAY}">
+                                            ${this.rgbToHex({ r: this.properties.main_color[0], g: this.properties.main_color[1], b: this.properties.main_color[2] }).toUpperCase()}
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
 
-                            <!-- Starburst Color -->
-                            <div class="color-input">
-                                <label style="display: block; color: #888; font-size: 11px; margin-bottom: 4px;">Starburst Color</label>
-                                <div style="
-                                    display: flex;
-                                    align-items: center;
-                                    background: rgba(0,0,0,0.2);
-                                    padding: 6px;
-                                    border-radius: 6px;
-                                    border: 1px solid rgba(255,255,255,0.05);
-                                ">
-                                    <input type="color" id="starburstColorPicker" 
-                                        value="#${this.properties.starburst_color[0].toString(16).padStart(2,'0')}${this.properties.starburst_color[1].toString(16).padStart(2,'0')}${this.properties.starburst_color[2].toString(16).padStart(2,'0')}"
-                                        style="width: 24px; height: 24px; border: none; background: none; cursor: pointer;"
-                                    />
-                                    <div style="margin-left: 6px; font-family: monospace; color: #aaa; font-size: 10px;">
-                                        #${this.properties.starburst_color[0].toString(16).padStart(2,'0')}${this.properties.starburst_color[1].toString(16).padStart(2,'0')}${this.properties.starburst_color[2].toString(16).padStart(2,'0')}
+                                <!-- Secondary Color -->
+                                <div class="color-input">
+                                    <label style="${UI_STYLES.COLOR.LABEL}">Secondary Color</label>
+                                    <div style="${UI_STYLES.COLOR.INPUT_CONTAINER}">
+                                        <input type="color" id="secondaryColorPicker"
+                                            value="${this.rgbToHex({ r: this.properties.secondary_color[0], g: this.properties.secondary_color[1], b: this.properties.secondary_color[2] })}"
+                                            style="${UI_STYLES.COLOR.INPUT}"
+                                        />
+                                        <div style="${UI_STYLES.COLOR.HEX_DISPLAY}">
+                                            ${this.rgbToHex({ r: this.properties.secondary_color[0], g: this.properties.secondary_color[1], b: this.properties.secondary_color[2] }).toUpperCase()}
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
 
-                            <!-- Ghost Color -->
-                            <div class="color-input">
-                                <label style="display: block; color: #888; font-size: 11px; margin-bottom: 4px;">Ghost Color</label>
-                                <div style="
-                                    display: flex;
-                                    align-items: center;
-                                    background: rgba(0,0,0,0.2);
-                                    padding: 6px;
-                                    border-radius: 6px;
-                                    border: 1px solid rgba(255,255,255,0.05);
-                                ">
-                                    <input type="color" id="ghostColorPicker" 
-                                        value="#${this.properties.ghost_color[0].toString(16).padStart(2,'0')}${this.properties.ghost_color[1].toString(16).padStart(2,'0')}${this.properties.ghost_color[2].toString(16).padStart(2,'0')}"
-                                        style="width: 24px; height: 24px; border: none; background: none; cursor: pointer;"
-                                    />
-                                    <div style="margin-left: 6px; font-family: monospace; color: #aaa; font-size: 10px;">
-                                        #${this.properties.ghost_color[0].toString(16).padStart(2,'0')}${this.properties.ghost_color[1].toString(16).padStart(2,'0')}${this.properties.ghost_color[2].toString(16).padStart(2,'0')}
+                                <!-- Starburst Color -->
+                                <div class="color-input">
+                                    <label style="${UI_STYLES.COLOR.LABEL}">Starburst Color</label>
+                                    <div style="${UI_STYLES.COLOR.INPUT_CONTAINER}">
+                                        <input type="color" id="starburstColorPicker" 
+                                            value="#${this.properties.starburst_color[0].toString(16).padStart(2,'0')}${this.properties.starburst_color[1].toString(16).padStart(2,'0')}${this.properties.starburst_color[2].toString(16).padStart(2,'0')}"
+                                            style="${UI_STYLES.COLOR.INPUT}"
+                                        />
+                                        <div style="${UI_STYLES.COLOR.HEX_DISPLAY}">
+                                            #${this.properties.starburst_color[0].toString(16).padStart(2,'0')}${this.properties.starburst_color[1].toString(16).padStart(2,'0')}${this.properties.starburst_color[2].toString(16).padStart(2,'0')}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Ghost Color -->
+                                <div class="color-input">
+                                    <label style="${UI_STYLES.COLOR.LABEL}">Ghost Color</label>
+                                    <div style="${UI_STYLES.COLOR.INPUT_CONTAINER}">
+                                        <input type="color" id="ghostColorPicker" 
+                                            value="#${this.properties.ghost_color[0].toString(16).padStart(2,'0')}${this.properties.ghost_color[1].toString(16).padStart(2,'0')}${this.properties.ghost_color[2].toString(16).padStart(2,'0')}"
+                                            style="${UI_STYLES.COLOR.INPUT}"
+                                        />
+                                        <div style="${UI_STYLES.COLOR.HEX_DISPLAY}">
+                                            #${this.properties.ghost_color[0].toString(16).padStart(2,'0')}${this.properties.ghost_color[1].toString(16).padStart(2,'0')}${this.properties.ghost_color[2].toString(16).padStart(2,'0')}
+                                        </div>
                                     </div>
                                 </div>
                             </div>
                         </div>
-                    </div>
 
-                        <!-- Flare Type Seçici -->
-                        <div class="control-section" style="
-                            background: rgba(0,0,0,0.2);
-                            padding: 16px;
-                            border-radius: 12px;
-                            border: 1px solid rgba(255,255,255,0.05);
-                        ">
-                            <div class="section-header" style="
-                                display: flex;
-                                align-items: center;
-                                justify-content: space-between;
-                                margin-bottom: 16px;
-                            ">
-                                <div style="display: flex; align-items: center; gap: 8px;">
-                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" style="color: #4a9eff;">
+                        <!-- Flare Type Selector (Second Column) -->
+                        <div style="${UI_STYLES.SECTION.CONTROL}">
+                            <div class="section-header" style="${UI_STYLES.SECTION.HEADER}">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" style="color: #4a9eff;">
                                     <circle cx="12" cy="12" r="3"/>
                                     <path d="M12 3v2m0 14v2M3 12h2m14 0h2"/>
                                     <path d="M5.6 5.6l1.4 1.4m10 10l1.4 1.4M5.6 18.4l1.4-1.4m10-10l1.4-1.4" opacity="0.5"/>
                                 </svg>
-                                    <span style="color: #eee; font-size: 13px; font-weight: 500;">Flare Type</span>
+                                <span style="${UI_STYLES.SECTION.TITLE}">Flare Type</span>
+                            </div>
+                            <div class="flare-types" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(30px, 1fr)); gap: 4px;">
+                                ${Object.entries(FLARE_TYPES).map(([key, value]) => `
+                                    <button class="flare-type-btn ${this.properties.flare_type === key ? 'active' : ''}" 
+                                        data-type="${key}"
+                                        title="${value}"
+                                        style="
+                                            width: 24px;
+                                            height: 24px;
+                                            background: ${this.properties.flare_type === key ? 'rgba(74, 158, 255, 0.1)' : 'rgba(0,0,0,0.2)'};
+                                            border: 1px solid ${this.properties.flare_type === key ? '#4a9eff' : 'rgba(255,255,255,0.05)'};
+                                            border-radius: 4px;
+                                            cursor: pointer;
+                                            display: flex;
+                                            align-items: center;
+                                            justify-content: center;
+                                            transition: all 0.2s;
+                                            padding: 0;
+                                        ">
+                                        <div style="
+                                            width: 12px;
+                                            height: 12px;
+                                            border-radius: 50%;
+                                            background: rgb(${DEFAULT_FLARE_CONFIGS[key].mainColor.r},${DEFAULT_FLARE_CONFIGS[key].mainColor.g},${DEFAULT_FLARE_CONFIGS[key].mainColor.b});
+                                            box-shadow: 0 0 6px rgb(${DEFAULT_FLARE_CONFIGS[key].mainColor.r},${DEFAULT_FLARE_CONFIGS[key].mainColor.g},${DEFAULT_FLARE_CONFIGS[key].mainColor.b});
+                                            opacity: 0.8;
+                                            transition: opacity 0.2s;
+                                        "></div>
+                                    </button>
+                                `).join('')}
                             </div>
                         </div>
-                            <div class="flare-types" style="
-                                display: grid;
-                                grid-template-columns: repeat(7, 1fr);
-                                gap: 4px;
-                            ">
-                        ${Object.entries(FLARE_TYPES).map(([key, value]) => `
-                                <button class="flare-type-btn ${this.properties.flare_type === key ? 'active' : ''}" 
-                                    data-type="${key}"
-                                    title="${value}"
-                                    style="
-                                    width: 26px;
-                                    height: 26px;
-                                    background: ${this.properties.flare_type === key ? 'rgba(74, 158, 255, 0.1)' : 'rgba(0,0,0,0.2)'};
-                                    border: 1px solid ${this.properties.flare_type === key ? '#4a9eff' : 'rgba(255,255,255,0.05)'};
-                                    border-radius: 6px;
-                                    cursor: pointer;
-                                    display: flex;
-                                    align-items: center;
-                                    justify-content: center;
-                                    transition: all 0.2s;
-                                ">
-                                <div style="
-                                    width: 14px;
-                                    height: 14px;
-                                    border-radius: 50%;
-                                    background: rgb(${DEFAULT_FLARE_CONFIGS[key].mainColor.r},${DEFAULT_FLARE_CONFIGS[key].mainColor.g},${DEFAULT_FLARE_CONFIGS[key].mainColor.b});
-                                    box-shadow: 0 0 8px rgb(${DEFAULT_FLARE_CONFIGS[key].mainColor.r},${DEFAULT_FLARE_CONFIGS[key].mainColor.g},${DEFAULT_FLARE_CONFIGS[key].mainColor.b});
-                                    opacity: 0.8;
-                                    transition: opacity 0.2s;
-                                "></div>
-                            </button>
-                        `).join('')}
-                    </div>
-                </div>
-
-                        <!-- Blend Mode Seçici -->
-                        <div class="control-section" style="
-                            background: rgba(0,0,0,0.2);
-                            padding: 16px;
-                            border-radius: 12px;
-                            border: 1px solid rgba(255,255,255,0.05);
-                        ">
-                            <div class="section-header" style="
-                                display: flex;
-                                align-items: center;
-                                gap: 8px;
-                                margin-bottom: 16px;
-                            ">
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" style="color: #4a9eff;">
+                        
+                        <!-- Blend Mode Selector (Third Column) -->
+                        <div style="${UI_STYLES.SECTION.CONTROL}">
+                            <div class="section-header" style="${UI_STYLES.SECTION.HEADER}">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" style="color: #4a9eff;">
                                     <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
                                 </svg>
-                                <span style="color: #eee; font-size: 13px; font-weight: 500;">Blend Mode</span>
+                                <span style="${UI_STYLES.SECTION.TITLE}">Blend Mode</span>
                             </div>
-                            <div class="blend-modes" style="
-                                display: grid;
-                                grid-template-columns: repeat(2, 1fr);
-                                gap: 6px;
-                            ">
+                            <div class="blend-modes" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 4px;">
                                 ${Object.entries(BLEND_MODES).map(([key, value]) => `
                                     <button class="blend-mode-btn ${this.properties.blend_mode === value ? 'active' : ''}" 
                                         data-mode="${value}"
@@ -2133,42 +2095,38 @@ app.registerExtension({
                                             border: 1px solid ${this.properties.blend_mode === value ? 
                                             '#4a9eff' : 
                                             'rgba(255,255,255,0.05)'};
-                                            padding: 8px;
-                                        border-radius: 8px;
+                                            padding: 3px;
+                                            border-radius: 4px;
                                             color: ${this.properties.blend_mode === value ? '#fff' : '#888'};
-                                        cursor: pointer;
-                                            font-size: 11px;
+                                            cursor: pointer;
+                                            font-size: 10px;
                                             font-weight: 500;
-                                        transition: all 0.2s;
+                                            transition: all 0.2s;
                                             text-align: center;
-                                        position: relative;
-                                        overflow: hidden;
+                                            position: relative;
+                                            overflow: hidden;
                                         ">
                                         ${key}
                                         ${this.properties.blend_mode === value ? `
                                         <div style="
                                             position: absolute;
-                                                bottom: 0;
-                                                left: 0;
-                                                width: 100%;
-                                                height: 2px;
-                                                background: linear-gradient(90deg, #4a9eff, #45e3ff);
+                                            bottom: 0;
+                                            left: 0;
+                                            width: 100%;
+                                            height: 2px;
+                                            background: linear-gradient(90deg, #4a9eff, #45e3ff);
                                         "></div>
                                     ` : ''}
-                            </button>
-                        `).join('')}
+                                    </button>
+                                `).join('')}
                             </div>
+                        </div>
                     </div>
-                </div>
 
-                    <!-- Slider Kategorileri -->
-                    <div style="
-                        display: grid;
-                        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-                        gap: 16px;
-                    ">
-                            ${this.generateSliderGroups()}
-                            </div>
+                    <!-- Slider Categories -->
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 8px;">
+                        ${this.generateSliderGroups()}
+                    </div>
                 </div>
             `;
 
@@ -2191,11 +2149,7 @@ app.registerExtension({
                 const b = parseInt(color.substr(5,2), 16);
                 
 
-                this.mainColor = { r, g, b };
-                
-
                 this.properties.main_color = [r, g, b];
-                this.properties.starburst_color = [r, g, b];
                 
 
                 const currentConfig = DEFAULT_FLARE_CONFIGS[this.properties.flare_type];
@@ -2218,12 +2172,7 @@ app.registerExtension({
                 }
                 
 
-                this.setDirtyCanvas(true);
-                if (this.graph) {
-                    this.graph.setDirtyCanvas(true, true);
-                    this.graph.runStep();
-                    this.graph.change();
-                }
+                this.updateCanvasAndGraph();
             });
 
 
@@ -2232,9 +2181,6 @@ app.registerExtension({
                 const r = parseInt(color.substr(1,2), 16);
                 const g = parseInt(color.substr(3,2), 16);
                 const b = parseInt(color.substr(5,2), 16);
-                
-
-                this.secondaryColor = { r, g, b };
                 
 
                 this.properties.secondary_color = [r, g, b];
@@ -2254,12 +2200,7 @@ app.registerExtension({
                 }
                 
 
-                this.setDirtyCanvas(true);
-                if (this.graph) {
-                    this.graph.setDirtyCanvas(true, true);
-                    this.graph.runStep();
-                    this.graph.change();
-                }
+                this.updateCanvasAndGraph();
             });
 
 
@@ -2275,17 +2216,230 @@ app.registerExtension({
             const rect = dialog.getBoundingClientRect();
             
 
+            
+            this.setupColorPicker(dialog, 'main', [255, 255, 255]);
+            this.setupColorPicker(dialog, 'secondary', [255, 255, 255]);
+            this.setupColorPicker(dialog, 'starburst', [255, 255, 255]);
+            this.setupColorPicker(dialog, 'ghost', [255, 255, 255]);
         };
 
 
         nodeType.prototype.setupDialogEventListeners = function(dialog) {
-
+            
             const mainColorPicker = dialog.querySelector('#mainColorPicker');
             const secondaryColorPicker = dialog.querySelector('#secondaryColorPicker');
             const starburstColorPicker = dialog.querySelector('#starburstColorPicker');
             const ghostColorPicker = dialog.querySelector('#ghostColorPicker');
 
+            
+            const flareTypeButtons = dialog.querySelectorAll('.flare-type-btn');
+            flareTypeButtons.forEach(btn => {
+                btn.onclick = () => {
+                    const selectedType = btn.dataset.type;
+                    this.properties.flare_type = selectedType;
 
+                    const config = DEFAULT_FLARE_CONFIGS[selectedType];
+                    if (config) {
+                        
+                        const mainColor = config.mainColor || { r: 255, g: 255, b: 255 };
+                        const secondaryColor = config.secondaryColor || { r: 255, g: 255, b: 255 };
+                        const ghostColor = config.ghostColor || { r: 255, g: 255, b: 255 };
+
+                        
+                        this.properties.main_color = [mainColor.r, mainColor.g, mainColor.b];
+                        this.properties.secondary_color = [secondaryColor.r, secondaryColor.g, secondaryColor.b];
+                        this.properties.ghost_color = [ghostColor.r, ghostColor.g, ghostColor.b];
+                        this.properties.starburst_color = [mainColor.r, mainColor.g, mainColor.b];
+
+                        
+                        this.ghostCount = config.ghostCount;
+                        this.ghostSpacing = config.ghostSpacing;
+                        this.ghostSizes = config.ghostSizes;
+                        this.ghostOpacities = config.ghostOpacities;
+                        this.anamorphicStretch = config.anamorphicStretch;
+
+                        
+                        const mainColorPicker = dialog.querySelector('#mainColorPicker');
+                        const secondaryColorPicker = dialog.querySelector('#secondaryColorPicker');
+                        const starburstColorPicker = dialog.querySelector('#starburstColorPicker');
+                        const ghostColorPicker = dialog.querySelector('#ghostColorPicker');
+
+                        if (mainColorPicker) {
+                            const mainHex = this.rgbToHex(mainColor);
+                            mainColorPicker.value = mainHex;
+                            const hexDisplay = mainColorPicker.nextElementSibling;
+                            if (hexDisplay) hexDisplay.textContent = mainHex.toUpperCase();
+                        }
+                        if (secondaryColorPicker) {
+                            const secondaryHex = this.rgbToHex(secondaryColor);
+                            secondaryColorPicker.value = secondaryHex;
+                            const hexDisplay = secondaryColorPicker.nextElementSibling;
+                            if (hexDisplay) hexDisplay.textContent = secondaryHex.toUpperCase();
+                        }
+                        if (starburstColorPicker) {
+                            const starburstHex = this.rgbToHex({ r: this.properties.starburst_color[0], g: this.properties.starburst_color[1], b: this.properties.starburst_color[2] });
+                            starburstColorPicker.value = starburstHex;
+                            const hexDisplay = starburstColorPicker.nextElementSibling;
+                            if (hexDisplay) hexDisplay.textContent = starburstHex.toUpperCase();
+                        }
+                        if (ghostColorPicker) {
+                            const ghostHex = this.rgbToHex({ r: this.properties.ghost_color[0], g: this.properties.ghost_color[1], b: this.properties.ghost_color[2] });
+                            ghostColorPicker.value = ghostHex;
+                            const hexDisplay = ghostColorPicker.nextElementSibling;
+                            if (hexDisplay) hexDisplay.textContent = ghostHex.toUpperCase();
+                        }
+
+                        
+                        if (config.defaultSettings) {
+                            Object.entries(config.defaultSettings).forEach(([key, defaultValue]) => {
+                                this.properties[key] = defaultValue;
+                                
+                                
+                                const widget = this.widgets?.find(w => w.name === key);
+                                if (widget) {
+                                    widget.value = defaultValue;
+                                }
+
+                                
+                                const slider = dialog.querySelector(`#${key}Slider`);
+                                const valueDisplay = dialog.querySelector(`#${key}Value`);
+                                if (slider && valueDisplay) {
+                                    slider.value = defaultValue;
+                                    valueDisplay.textContent = this.formatSliderValue(key, defaultValue);
+                                    const range = SLIDER_RANGES[key] || { min: 0, max: 1 };
+                                    const percent = ((defaultValue - range.min) / (range.max - range.min)) * 100;
+                                    slider.style.background = `linear-gradient(90deg, #4a9eff ${percent}%, rgba(255,255,255,0.1) ${percent}%)`;
+                                }
+                            });
+                        }
+                    }
+
+                    
+                    flareTypeButtons.forEach(b => {
+                        const isActive = b.dataset.type === selectedType;
+                        b.classList.toggle('active', isActive);
+                        b.style.borderColor = isActive ? '#4a9eff' : 'rgba(255,255,255,0.05)';
+                        b.style.background = isActive ? 'rgba(74, 158, 255, 0.1)' : 'rgba(0,0,0,0.2)';
+                    });
+
+                    
+                    this._cachedCanvas = null;
+                    this._lastRenderConfig = null;
+                    this.setDirtyCanvas(true);
+
+                    
+                    if (this.graph) {
+                        this.graph.setDirtyCanvas(true, true);
+                        this.graph.runStep();
+                        this.graph.change();
+                    }
+
+                    const flareTypeSubtitle = dialog.querySelector('.flare-type-subtitle');
+                    if (flareTypeSubtitle) {
+                        flareTypeSubtitle.textContent = FLARE_TYPES[selectedType];
+                    }
+                };
+            });
+
+            
+            const blendModeButtons = dialog.querySelectorAll('.blend-mode-btn');
+            blendModeButtons.forEach(btn => {
+                btn.onclick = () => {
+                    const selectedMode = btn.dataset.mode;
+                    this.properties.blend_mode = selectedMode;
+                    
+                    const widget = this.widgets?.find(w => w.name === 'blend_mode');
+                    if (widget) {
+                        widget.value = selectedMode;
+                    }
+                    
+                    blendModeButtons.forEach(b => {
+                        const isActive = b.dataset.mode === selectedMode;
+                        b.style.background = isActive ? 
+                            'linear-gradient(45deg, #4a9eff, #2d7ed9)' : 
+                            'rgba(255,255,255,0.03)';
+                        b.style.borderColor = isActive ? '#4a9eff' : 'rgba(255,255,255,0.05)';
+                        b.style.color = isActive ? '#fff' : '#888';
+                    });
+                    
+                    this.updateCanvasAndGraph();
+                };
+            });
+
+            
+            const sliders = dialog.querySelectorAll('input[type="range"]');
+            sliders.forEach(slider => {
+                const updateSliderUI = () => {
+                    const value = parseFloat(slider.value);
+                    const key = slider.id.replace('Slider', '');
+                    
+                    
+                    const valueDisplay = dialog.querySelector(`#${key}Value`);
+                    if (valueDisplay) {
+                        valueDisplay.textContent = this.formatSliderValue(key, value);
+                    }
+                    
+                    const percent = ((value - slider.min) / (slider.max - slider.min)) * 100;
+                    slider.style.background = `linear-gradient(90deg, 
+                        #4a9eff ${percent}%, 
+                        rgba(255,255,255,0.1) ${percent}%
+                    )`;
+
+                    
+                    this.properties[key] = value;
+
+                    
+                    if (this.widgets) {
+                        const widget = this.widgets.find(w => w.name === key);
+                        if (widget) {
+                            widget.value = value;
+                        }
+                    }
+
+                    
+                    this._cachedCanvas = null;
+                    this._lastRenderConfig = null;
+                    this.setDirtyCanvas(true);
+                    if (this.graph) {
+                        this.graph.setDirtyCanvas(true, true);
+                    }
+                };
+
+                
+                slider.oninput = updateSliderUI;
+                slider.onchange = updateSliderUI;
+                
+                
+                updateSliderUI();
+            });
+
+            
+            if (mainColorPicker) {
+                mainColorPicker.addEventListener('input', (e) => {
+                    const color = e.target.value;
+                    const r = parseInt(color.substr(1,2), 16);
+                    const g = parseInt(color.substr(3,2), 16);
+                    const b = parseInt(color.substr(5,2), 16);
+                    
+                    this.properties.main_color = [r, g, b];
+                    
+                    if (this.widgets) {
+                        const mainColorWidget = this.widgets.find(w => w.name === 'main_color');
+                        if (mainColorWidget) {
+                            mainColorWidget.value = [r, g, b];
+                        }
+                    }
+                    
+                    const hexDisplay = e.target.nextElementSibling;
+                    if (hexDisplay) {
+                        hexDisplay.textContent = color.toUpperCase();
+                    }
+                    
+                    this.updateCanvasAndGraph();
+                });
+            }
+
+            
             if (secondaryColorPicker) {
                 secondaryColorPicker.addEventListener('input', (e) => {
                     const color = e.target.value;
@@ -2293,13 +2447,8 @@ app.registerExtension({
                     const g = parseInt(color.substr(3,2), 16);
                     const b = parseInt(color.substr(5,2), 16);
                     
-
-                    this.secondaryColor = { r, g, b };
-                    
-
                     this.properties.secondary_color = [r, g, b];
                     
-
                     if (this.widgets) {
                         const secondaryColorWidget = this.widgets.find(w => w.name === 'secondary_color');
                         if (secondaryColorWidget) {
@@ -2307,24 +2456,76 @@ app.registerExtension({
                         }
                     }
                     
-
                     const hexDisplay = e.target.nextElementSibling;
                     if (hexDisplay) {
                         hexDisplay.textContent = color.toUpperCase();
                     }
                     
-
-                    this.setDirtyCanvas(true);
-                    if (this.graph) {
-                        this.graph.setDirtyCanvas(true, true);
-                        this.graph.runStep();
-                        this.graph.change();
-                    }
+                    this.updateCanvasAndGraph();
                 });
             }
 
+            
+            if (starburstColorPicker) {
+                starburstColorPicker.addEventListener('input', (e) => {
+                    const color = e.target.value;
+                    const r = parseInt(color.substr(1,2), 16);
+                    const g = parseInt(color.substr(3,2), 16);
+                    const b = parseInt(color.substr(5,2), 16);
+                    
+                    this.properties.starburst_color = [r, g, b];
+                    
+                    const currentConfig = DEFAULT_FLARE_CONFIGS[this.properties.flare_type];
+                    if (currentConfig && currentConfig.colors) {
+                        currentConfig.colors.starburst = [r, g, b];
+                    }
+                    
+                    if (this.widgets) {
+                        const starburstColorWidget = this.widgets.find(w => w.name === 'starburst_color');
+                        if (starburstColorWidget) {
+                            starburstColorWidget.value = [r, g, b];
+                        }
+                    }
+                    
+                    const hexDisplay = e.target.nextElementSibling;
+                    if (hexDisplay) {
+                        hexDisplay.textContent = color.toUpperCase();
+                    }
+                    
+                    this.updateCanvasAndGraph();
+                });
+            }
 
-
+            
+            if (ghostColorPicker) {
+                ghostColorPicker.addEventListener('input', (e) => {
+                    const color = e.target.value;
+                    const r = parseInt(color.substr(1,2), 16);
+                    const g = parseInt(color.substr(3,2), 16);
+                    const b = parseInt(color.substr(5,2), 16);
+                    
+                    this.properties.ghost_color = [r, g, b];
+                    
+                    const currentConfig = DEFAULT_FLARE_CONFIGS[this.properties.flare_type];
+                    if (currentConfig && currentConfig.colors) {
+                        currentConfig.colors.ghost = [r, g, b];
+                    }
+                    
+                    if (this.widgets) {
+                        const ghostColorWidget = this.widgets.find(w => w.name === 'ghost_color');
+                        if (ghostColorWidget) {
+                            ghostColorWidget.value = [r, g, b];
+                        }
+                    }
+                    
+                    const hexDisplay = e.target.nextElementSibling;
+                    if (hexDisplay) {
+                        hexDisplay.textContent = color.toUpperCase();
+                    }
+                    
+                    this.updateCanvasAndGraph();
+                });
+            }
         };
 
 
@@ -2341,59 +2542,62 @@ app.registerExtension({
         };
 
 
-        nodeType.prototype.onMouseMove = nodeType.prototype.debounce(function(e, local_pos) {
-
-        }, 16);
-
-
-        nodeType.prototype.updateSliderValue = nodeType.prototype.debounce(function(x, sliderKey) {
-
-        }, 32);
-
-
         nodeType.prototype.rgbToHex = function(color) {
-            return `#${color.r.toString(16).padStart(2,'0')}${color.g.toString(16).padStart(2,'0')}${color.b.toString(16).padStart(2,'0')}`;
+            if (!color) return '#FFFFFF';
+            
+            try {
+                if (Array.isArray(color)) {
+                    return '#' + color.map(c => {
+                        const hex = Math.max(0, Math.min(255, Math.round(c))).toString(16);
+                        return hex.length === 1 ? '0' + hex : hex;
+                    }).join('');
+                } else if (typeof color === 'string' && color.startsWith('hsla')) {
+                    
+                    const matches = color.match(/hsla?\((\d+),\s*(\d+)%,\s*(\d+)%,?\s*(?:\d*\.?\d+)?\)/);
+                    if (matches) {
+                        const [_, h, s, l] = matches.map(Number);
+                        
+                        const c = (1 - Math.abs(2 * l / 100 - 1)) * s / 100;
+                        const x = c * (1 - Math.abs((h / 60) % 2 - 1));
+                        const m = l / 100 - c / 2;
+                        let [r, g, b] = [0, 0, 0];
+                        
+                        if (h < 60) [r, g, b] = [c, x, 0];
+                        else if (h < 120) [r, g, b] = [x, c, 0];
+                        else if (h < 180) [r, g, b] = [0, c, x];
+                        else if (h < 240) [r, g, b] = [0, x, c];
+                        else if (h < 300) [r, g, b] = [x, 0, c];
+                        else [r, g, b] = [c, 0, x];
+                        
+                        return '#' + [(r + m), (g + m), (b + m)].map(v => {
+                            const hex = Math.round(v * 255).toString(16);
+                            return hex.length === 1 ? '0' + hex : hex;
+                        }).join('');
+                    }
+                    return '#FFFFFF';
+                } else if (typeof color === 'object') {
+                    return '#' + [color.r, color.g, color.b].map(c => {
+                        const hex = Math.max(0, Math.min(255, Math.round(c))).toString(16);
+                        return hex.length === 1 ? '0' + hex : hex;
+                    }).join('');
+                }
+            } catch (e) {
+                console.warn('Color conversion error:', e);
+                return '#FFFFFF';
+            }
+            return '#FFFFFF';
         };
 
-        nodeType.prototype.updateColorPickers = function(dialog, mainColor, secondaryColor) {
-            const mainColorPicker = dialog.querySelector('#mainColorPicker');
-            const secondaryColorPicker = dialog.querySelector('#secondaryColorPicker');
-            const starburstColorPicker = dialog.querySelector('#starburstColorPicker');
-            const ghostColorPicker = dialog.querySelector('#ghostColorPicker');
-
-            if (mainColorPicker) {
-                const mainHex = this.rgbToHex(mainColor);
-                mainColorPicker.value = mainHex;
-                mainColorPicker.nextElementSibling.textContent = mainHex.toUpperCase();
-            }
-            
-            if (secondaryColorPicker) {
-                const secondaryHex = this.rgbToHex(secondaryColor);
-                secondaryColorPicker.value = secondaryHex;
-                secondaryColorPicker.nextElementSibling.textContent = secondaryHex.toUpperCase();
-            }
-
-
-            if (starburstColorPicker && this.properties.starburst_color) {
-                const starburstHex = this.rgbToHex({
-                    r: this.properties.starburst_color[0],
-                    g: this.properties.starburst_color[1],
-                    b: this.properties.starburst_color[2]
-                });
-                starburstColorPicker.value = starburstHex;
-                starburstColorPicker.nextElementSibling.textContent = starburstHex.toUpperCase();
-            }
-            
-            if (ghostColorPicker && this.properties.ghost_color) {
-                const ghostHex = this.rgbToHex({
-                    r: this.properties.ghost_color[0],
-                    g: this.properties.ghost_color[1],
-                    b: this.properties.ghost_color[2]
-                });
-                ghostColorPicker.value = ghostHex;
-                ghostColorPicker.nextElementSibling.textContent = ghostHex.toUpperCase();
+        
+        nodeType.prototype.updateCanvasAndGraph = function() {
+            this.setDirtyCanvas(true);
+            if (this.graph) {
+                this.graph.setDirtyCanvas(true, true);
+                this.graph.runStep();
+                this.graph.change();
             }
         };
+
 
         nodeType.prototype.updateWidgetColors = function(mainColor, secondaryColor) {
             if (this.widgets) {
@@ -2403,285 +2607,6 @@ app.registerExtension({
                     } else if (widget.name === 'secondary_color') {
                         widget.value = [secondaryColor.r, secondaryColor.g, secondaryColor.b];
                     }
-                });
-            }
-        };
-
-
-        nodeType.prototype.setupDialogEventListeners = function(dialog) {
-
-            const flareTypeButtons = dialog.querySelectorAll('.flare-type-btn');
-            flareTypeButtons.forEach(btn => {
-                btn.onclick = () => {
-                    const selectedType = btn.dataset.type;
-                    
-
-                    this.properties.flare_type = selectedType;
-                    
-
-                    const config = DEFAULT_FLARE_CONFIGS[selectedType];
-                    if (config) {
-
-                        this.mainColor = {...config.mainColor};
-                        this.secondaryColor = {...config.secondaryColor};
-
-
-                        this.properties.main_color = [this.mainColor.r, this.mainColor.g, this.mainColor.b];
-                        this.properties.secondary_color = [this.secondaryColor.r, this.secondaryColor.g, this.secondaryColor.b];
-
-
-                        if (!this.properties.starburst_color) {
-                        this.properties.starburst_color = [this.mainColor.r, this.mainColor.g, this.mainColor.b];
-                        }
-
-
-                        this.updateColorPickers(dialog, this.mainColor, this.secondaryColor);
-                        
-
-                        if (this.widgets) {
-                            this.widgets.forEach(widget => {
-                                if (widget.name === 'main_color') {
-                                    widget.value = [this.mainColor.r, this.mainColor.g, this.mainColor.b];
-                                } else if (widget.name === 'secondary_color') {
-                                    widget.value = [this.secondaryColor.r, this.secondaryColor.g, this.secondaryColor.b];
-                                }
-                            });
-                        }
-
-
-                        flareTypeButtons.forEach(b => {
-                            const isActive = b.dataset.type === selectedType;
-                            b.classList.toggle('active', isActive);
-                            b.style.borderColor = isActive ? '#4a9eff' : 'rgba(255,255,255,0.05)';
-                            b.style.background = isActive ? 'rgba(74, 158, 255, 0.1)' : 'rgba(0,0,0,0.2)';
-                        });
-
-
-                        if (config.defaultSettings) {
-                            Object.assign(this.properties, config.defaultSettings);
-                        }
-
-
-                        const sliders = dialog.querySelectorAll('input[type="range"]');
-                        sliders.forEach(slider => {
-                            const key = slider.id.replace('Slider', '');
-                            if (config.defaultSettings[key] !== undefined) {
-                                slider.value = config.defaultSettings[key];
-                                
-
-                                const valueDisplay = dialog.querySelector(`#${key}Value`);
-                                if (valueDisplay) {
-                                    valueDisplay.textContent = this.formatSliderValue(key, config.defaultSettings[key]);
-                                }
-                                
-
-                                const percent = ((config.defaultSettings[key] - slider.min) / (slider.max - slider.min)) * 100;
-                                slider.style.background = `linear-gradient(90deg, 
-                                    #4a9eff ${percent}%, 
-                                    rgba(255,255,255,0.1) ${percent}%
-                                )`;
-                            }
-                        });
-                    }
-
-
-                    const flareTypeSubtitle = dialog.querySelector('.flare-type-subtitle');
-                    if (flareTypeSubtitle) {
-                        flareTypeSubtitle.textContent = FLARE_TYPES[selectedType];
-                    }
-
-
-                    this.setDirtyCanvas(true);
-                    if (this.graph) {
-                        this.graph.setDirtyCanvas(true, true);
-                        this.graph.runStep();
-                        this.graph.change();
-                    }
-                };
-            });
-
-
-            const blendModeButtons = dialog.querySelectorAll('.blend-mode-btn');
-            blendModeButtons.forEach(btn => {
-                btn.onclick = () => {
-                    const selectedMode = btn.dataset.mode;
-                    this.properties.blend_mode = selectedMode;
-                    
-
-                    const widget = this.widgets?.find(w => w.name === 'blend_mode');
-                    if (widget) {
-                        widget.value = selectedMode;
-                    }
-                    
-
-                    blendModeButtons.forEach(b => {
-                        const isActive = b.dataset.mode === selectedMode;
-                        b.style.background = isActive ? 
-                            'linear-gradient(45deg, #4a9eff, #2d7ed9)' : 
-                            'rgba(255,255,255,0.03)';
-                        b.style.borderColor = isActive ? '#4a9eff' : 'rgba(255,255,255,0.05)';
-                        b.style.color = isActive ? '#fff' : '#888';
-                    });
-                    
-
-                    this.setDirtyCanvas(true);
-                    if (this.graph) {
-                        this.graph.setDirtyCanvas(true, true);
-                        this.graph.runStep();
-                        this.graph.change();
-                    }
-                };
-            });
-
-
-            const sliders = dialog.querySelectorAll('input[type="range"]');
-            sliders.forEach(slider => {
-                const updateSlider = () => {
-                    const value = parseFloat(slider.value);
-                    const key = slider.id.replace('Slider', '');
-                    
-
-                    if (this.properties[key] === value) return;
-                    
-
-                    this.properties[key] = value;
-                    
-
-                    requestAnimationFrame(() => {
-                        const valueDisplay = dialog.querySelector(`#${key}Value`);
-                        if (valueDisplay) {
-                            valueDisplay.textContent = this.formatSliderValue(key, value);
-                        }
-                        
-
-                        const percent = ((value - slider.min) / (slider.max - slider.min)) * 100;
-                        slider.style.background = `linear-gradient(90deg, 
-                            #4a9eff ${percent}%, 
-                            rgba(255,255,255,0.1) ${percent}%
-                        )`;
-
-
-                        this.setDirtyCanvas(true);
-                        if (this.graph) {
-                            this.graph.setDirtyCanvas(true, true);
-                            this.graph.runStep();
-                            this.graph.change();
-                        }
-                    });
-                };
-
-
-                slider.oninput = updateSlider;
-                slider.onchange = updateSlider;
-                
-
-                updateSlider();
-            });
-
-
-            const mainColorPicker = dialog.querySelector('#mainColorPicker');
-            const starburstColorPicker = dialog.querySelector('#starburstColorPicker');
-            const ghostColorPicker = dialog.querySelector('#ghostColorPicker');
-
-
-            if (starburstColorPicker) {
-                starburstColorPicker.addEventListener('input', (e) => {
-                    const color = e.target.value;
-                    const r = parseInt(color.substr(1,2), 16);
-                    const g = parseInt(color.substr(3,2), 16);
-                    const b = parseInt(color.substr(5,2), 16);
-                    
-
-                    this.properties.starburst_color = [r, g, b];
-                    
-
-                    const currentConfig = DEFAULT_FLARE_CONFIGS[this.properties.flare_type];
-                    if (currentConfig && currentConfig.colors) {
-                        currentConfig.colors.starburst = [r, g, b];
-                    }
-                    
-
-                    if (this.widgets) {
-                        const starburstColorWidget = this.widgets.find(w => w.name === 'starburst_color');
-                        if (starburstColorWidget) {
-                            starburstColorWidget.value = [r, g, b];
-                        }
-                    }
-                    
-
-                    const hexDisplay = e.target.nextElementSibling;
-                    if (hexDisplay) {
-                        hexDisplay.textContent = color.toUpperCase();
-                    }
-                    
-
-                    this.setDirtyCanvas(true);
-                    if (this.graph) {
-                        this.graph.setDirtyCanvas(true, true);
-                    }
-                });
-            }
-
-
-            if (ghostColorPicker) {
-                ghostColorPicker.addEventListener('input', (e) => {
-                    const color = e.target.value;
-                    const r = parseInt(color.substr(1,2), 16);
-                    const g = parseInt(color.substr(3,2), 16);
-                    const b = parseInt(color.substr(5,2), 16);
-                    
-
-                    this.properties.ghost_color = [r, g, b];
-                    
-
-                    const currentConfig = DEFAULT_FLARE_CONFIGS[this.properties.flare_type];
-                    if (currentConfig && currentConfig.colors) {
-                        currentConfig.colors.ghost = [r, g, b];
-                    }
-                    
-
-                    if (this.widgets) {
-                        const ghostColorWidget = this.widgets.find(w => w.name === 'ghost_color');
-                        if (ghostColorWidget) {
-                            ghostColorWidget.value = [r, g, b];
-                        }
-                    }
-                    
-
-                    const hexDisplay = e.target.nextElementSibling;
-                    if (hexDisplay) {
-                        hexDisplay.textContent = color.toUpperCase();
-                    }
-                    
-
-                    this.setDirtyCanvas(true);
-                    if (this.graph) {
-                        this.graph.setDirtyCanvas(true, true);
-                    }
-                });
-            }
-
-
-            const secondaryColorPicker = dialog.querySelector('#secondaryColorPicker');
-            
-            if (secondaryColorPicker) {
-                secondaryColorPicker.addEventListener('input', (e) => {
-                    const color = e.target.value;
-                    const r = parseInt(color.substr(1,2), 16);
-                    const g = parseInt(color.substr(3,2), 16);
-                    const b = parseInt(color.substr(5,2), 16);
-                    
-
-                    this.secondaryColor = { r, g, b };
-                    this.properties.secondary_color = [r, g, b];
-                    
-
-                    if (this.widgets) {
-                        const widget = this.widgets.find(w => w.name === 'secondary_color');
-                        if (widget) widget.value = [r, g, b];
-                    }
-                    
-                    this.setDirtyCanvas(true);
                 });
             }
         };
@@ -2789,15 +2714,7 @@ app.registerExtension({
 
 
         nodeType.prototype.formatSliderValue = function(key, value) {
-            switch(key) {
-                case "color_temperature": return `${Math.round(value)}K`;
-                case "rotation": return `${Math.round(value)}°`;
-                case "position_x":
-                case "position_y":
-                case "starburst_position_x":
-                case "starburst_position_y": return value.toFixed(2);
-                default: return value.toFixed(2);
-            }
+            return FORMAT_HELPERS.formatSliderValue(key, value);
         };
 
 
@@ -2807,59 +2724,24 @@ app.registerExtension({
             const percent = ((value - range.min) / (range.max - range.min)) * 100;
 
             return `
-                <div class="slider-group" style="
-                    background: rgba(0,0,0,0.2);
-                    padding: 8px;
-                    border-radius: 6px;
-                ">
-                    <div style="
-                        display: flex;
-                        justify-content: space-between;
-                        align-items: center;
-                        margin-bottom: 4px;
-                    ">
-                        <label style="
-                            color: #888;
-                            font-size: 11px;
-                            font-weight: 500;
-                            display: flex;
-                            align-items: center;
-                            gap: 6px;
-                        ">
-                            <span>${slider.icon}</span>
+                <div class="slider-group" style="${UI_STYLES.SLIDER_GROUP.CONTAINER}">
+                    <div style="${UI_STYLES.SLIDER_GROUP.HEADER}">
+                        <label style="${UI_STYLES.SLIDER_GROUP.HEADER_LABEL}">
+                            <span style="${UI_STYLES.SLIDER_GROUP.HEADER_ICON}">${slider.icon}</span>
                             ${slider.label}
                         </label>
-                        <span style="
-                            color: #4a9eff;
-                            font-size: 11px;
-                            font-weight: 500;
-                        " id="${slider.key}Value">
+                        <span style="${UI_STYLES.SLIDER_GROUP.HEADER_VALUE}" id="${slider.key}Value">
                             ${this.formatSliderValue(slider.key, value)}
                         </span>
                     </div>
-                    <div class="slider-container" style="
-                        background: rgba(255,255,255,0.03);
-                        border-radius: 4px;
-                        padding: 2px;
-                        position: relative;
-                    ">
+                    <div class="slider-container" style="${UI_STYLES.SLIDER_GROUP.SLIDER_CONTAINER}">
                         <input type="range"
                             id="${slider.key}Slider"
                             value="${value}"
                             min="${range.min}"
                             max="${range.max}"
                             step="${range.step}"
-                            style="
-                                width: 100%;
-                                -webkit-appearance: none;
-                                background: linear-gradient(90deg, 
-                                    #4a9eff ${percent}%, 
-                                    rgba(255,255,255,0.1) ${percent}%
-                                );
-                                cursor: pointer;
-                                height: 4px;
-                                border-radius: 2px;
-                            "
+                            style="${UI_STYLES.SLIDER_GROUP.SLIDER_INPUT}"
                         >
                     </div>
                 </div>
@@ -2871,12 +2753,12 @@ app.registerExtension({
             const categories = Object.values(SLIDER_CATEGORIES);
             
             return categories.map(category => `
-                <div class="slider-category control-section" style="${UI_STYLES.SLIDER_GROUP.CONTAINER}">
-                    <div class="section-header" style="${UI_STYLES.SLIDER_GROUP.HEADER}">
-                        <span style="${UI_STYLES.SLIDER_GROUP.HEADER_ICON}">${category.icon || ''}</span>
-                        <span style="${UI_STYLES.SLIDER_GROUP.HEADER_TEXT}">${category.name}</span>
+                <div class="slider-category control-section" style="${UI_STYLES.SLIDER_GROUP.CATEGORY_CONTAINER}">
+                    <div class="section-header" style="${UI_STYLES.SLIDER_GROUP.CATEGORY_HEADER}">
+                        <span style="${UI_STYLES.SLIDER_GROUP.CATEGORY_HEADER_ICON}">${category.icon || ''}</span>
+                        <span style="${UI_STYLES.SLIDER_GROUP.CATEGORY_HEADER_TEXT}">${category.name}</span>
                     </div>
-                    <div style="${UI_STYLES.SLIDER_GROUP.SLIDERS_CONTAINER}">
+                    <div style="${UI_STYLES.SLIDER_GROUP.CATEGORY_SLIDERS_CONTAINER}">
                         ${category.sliders.map(slider => this.generateSlider(slider)).join('')}
                     </div>
                 </div>
@@ -2885,28 +2767,12 @@ app.registerExtension({
 
 
         nodeType.prototype.createGradient = function(ctx, config, x = 0, y = 0) {
-            const { type, stops, radius } = config;
-            let gradient;
-
-            if (type === GRADIENT_HELPERS.TYPES.RADIAL) {
-                gradient = ctx.createRadialGradient(x, y, 0, x, y, radius);
-            } else {
-                gradient = ctx.createLinearGradient(x, y, x + radius, y);
-            }
-
-            stops.forEach(stop => {
-                gradient.addColorStop(stop.position, stop.color);
-            });
-
-            return gradient;
+            return FORMAT_HELPERS.createGradient(ctx, config, x, y);
         };
 
 
         nodeType.prototype.createColorString = function(color, opacity = 1) {
-            if (Array.isArray(color)) {
-                return `rgba(${color[0]},${color[1]},${color[2]},${opacity})`;
-            }
-            return color;
+            return FORMAT_HELPERS.createColorString(color, opacity);
         };
 
 
@@ -2979,61 +2845,7 @@ app.registerExtension({
 
 
         nodeType.prototype.generateDustPattern = function(ctx, size, params) {
-            const { NOISE_SCALE, TURBULENCE, DETAIL_LEVELS, BASE_FREQUENCY, PERSISTENCE } = ATMOSPHERIC_EFFECTS.DUST_PARTICLES.PATTERN;
-            
-
-            const generateNoise = (x, y, freq) => {
-                return Math.sin(x * freq) * Math.cos(y * freq) * 
-                       Math.sin((x + y) * freq * 0.5) * 0.5 + 0.5;
-            };
-
-            const tempCanvas = document.createElement('canvas');
-            tempCanvas.width = size;
-            tempCanvas.height = size;
-            const tempCtx = tempCanvas.getContext('2d');
-
-            const imageData = tempCtx.createImageData(size, size);
-            const data = imageData.data;
-
-            for (let y = 0; y < size; y++) {
-                for (let x = 0; x < size; x++) {
-                    const index = (y * size + x) * 4;
-                    let value = 0;
-                    let amplitude = 1;
-                    let frequency = BASE_FREQUENCY;
-
-
-                    for (let i = 0; i < DETAIL_LEVELS; i++) {
-                        value += generateNoise(
-                            x * NOISE_SCALE + Math.random() * TURBULENCE,
-                            y * NOISE_SCALE + Math.random() * TURBULENCE,
-                            frequency
-                        ) * amplitude;
-                        
-                        amplitude *= PERSISTENCE;
-                        frequency *= 2;
-                    }
-
-
-                    value = Math.min(1, Math.max(0, value / DETAIL_LEVELS));
-                    value = Math.pow(value, 1.5);
-
-
-                    const dx = x - size / 2;
-                    const dy = y - size / 2;
-                    const distanceFromCenter = Math.sqrt(dx * dx + dy * dy) / (size / 2);
-                    const falloff = Math.max(0, 1 - distanceFromCenter);
-                    value *= falloff * falloff;
-
-                    data[index] = 255;
-                    data[index + 1] = 255;
-                    data[index + 2] = 255;
-                    data[index + 3] = value * 255;
-                }
-            }
-
-            tempCtx.putImageData(imageData, 0, 0);
-            return tempCanvas;
+            return UI_HELPERS.generateDustPattern(ctx, size, params, this.id);
         };
 
 
@@ -3124,113 +2936,124 @@ app.registerExtension({
 
 
         nodeType.prototype.renderDiffractionRings = function(ctx, radius, intensity) {
-            const DC = RENDER_CONSTANTS.DIFFRACTION;
-            ctx.save();
-            ctx.globalCompositeOperation = 'screen';
+            const { RING_COUNT, RING_SPACING, BASE_INTENSITY, INTENSITY_DECAY } = RENDER_CONSTANTS.DIFFRACTION;
+            const diffraction_intensity = this.properties.diffraction_intensity;
             
-            for (let i = 0; i < DC.RING_COUNT; i++) {
-                const ringRadius = radius * (1 + i * DC.RING_SPACING);
-                const ringIntensity = this.properties.diffraction_intensity * (1 - i * DC.INTENSITY_DECAY);
+            if (diffraction_intensity <= 0) return;
+            
+            
+            const mainColorRgb = this.properties.main_color || [255, 255, 255];
+            
+            for (let i = 0; i < RING_COUNT; i++) {
+                const ringRadius = radius * (1 + (i * RING_SPACING));
+                const intensity_factor = BASE_INTENSITY - (i * INTENSITY_DECAY);
+                const opacity = diffraction_intensity * intensity * intensity_factor;
                 
-
-                this.renderDiffractionRing(ctx, {
-                    radius: ringRadius,
-                    intensity: intensity * DC.BASE_INTENSITY * ringIntensity,
-                    ringIndex: i,
-                    totalRings: DC.RING_COUNT
-                });
+                if (opacity <= 0.01) continue;
                 
-
-                this.renderDetailRing(ctx, {
-                    radius: ringRadius,
-                    intensity: intensity * DC.BASE_INTENSITY * ringIntensity * 1.2,
-                    ringIndex: i,
-                    totalRings: DC.RING_COUNT
-                });
+                ctx.beginPath();
+                ctx.strokeStyle = FORMAT_HELPERS.createColorString(mainColorRgb, opacity);
+                ctx.lineWidth = radius * 0.02;
+                ctx.arc(0, 0, ringRadius, 0, Math.PI * 2);
+                ctx.stroke();
             }
             
-            ctx.restore();
+            
+            const innerRingColor = FORMAT_HELPERS.createColorString(mainColorRgb, diffraction_intensity * intensity * 0.3);
+            const outerRingColor = FORMAT_HELPERS.createColorString(mainColorRgb, diffraction_intensity * intensity * 0.15);
+            
+            ctx.lineWidth = radius * 0.005;
+            
+            
+            ctx.beginPath();
+            ctx.strokeStyle = innerRingColor;
+            ctx.arc(0, 0, radius * RENDER_CONSTANTS.DIFFRACTION.DETAIL_RING_INNER, 0, Math.PI * 2);
+            ctx.stroke();
+            
+            
+            ctx.beginPath();
+            ctx.strokeStyle = outerRingColor;
+            ctx.arc(0, 0, radius * RENDER_CONSTANTS.DIFFRACTION.DETAIL_RING_OUTER, 0, Math.PI * 2);
+            ctx.stroke();
         };
 
 
         nodeType.prototype.renderAtmosphericScatter = function(ctx, radius, intensity) {
-            const AC = RENDER_CONSTANTS.ATMOSPHERIC;
-            ctx.save();
-            ctx.globalCompositeOperation = 'screen';
+            const scatter_amount = this.properties.atmospheric_scatter;
             
-            for (let i = 0; i < AC.LAYER_COUNT; i++) {
-                const scatterRadius = radius * (AC.BASE_RADIUS + i * AC.RADIUS_INCREMENT);
-                const scatterIntensity = this.properties.atmospheric_scatter * (1 - i * AC.INTENSITY_DECAY);
+            if (scatter_amount <= 0) return;
+            
+            const { LAYER_COUNT, BASE_RADIUS, RADIUS_INCREMENT, INTENSITY_DECAY } = RENDER_CONSTANTS.ATMOSPHERIC;
+            const mainColorRgb = this.properties.main_color || [255, 255, 255];
+            
+            for (let i = 0; i < LAYER_COUNT; i++) {
+                const layerRadius = radius * (BASE_RADIUS + (i * RADIUS_INCREMENT));
+                const layerIntensity = intensity * scatter_amount * (1 - (i * INTENSITY_DECAY));
                 
-                this.renderAtmosphericLayer(ctx, {
-                    radius: scatterRadius,
-                    baseIntensity: intensity,
-                    scatterIntensity: scatterIntensity,
-                    glowStops: AC.GLOW_STOPS
-                });
+                if (layerIntensity <= 0.01) continue;
+                
+                const glow = ctx.createRadialGradient(0, 0, 0, 0, 0, layerRadius);
+                
+                
+                glow.addColorStop(0, FORMAT_HELPERS.createColorString(mainColorRgb, layerIntensity * RENDER_CONSTANTS.ATMOSPHERIC.GLOW_STOPS.START));
+                glow.addColorStop(0.5, FORMAT_HELPERS.createColorString(mainColorRgb, layerIntensity * RENDER_CONSTANTS.ATMOSPHERIC.GLOW_STOPS.MIDDLE));
+                glow.addColorStop(1, FORMAT_HELPERS.createColorString(mainColorRgb, 0)); 
+                
+                ctx.fillStyle = glow;
+                ctx.beginPath();
+                ctx.arc(0, 0, layerRadius, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        };
+
+
+        nodeType.prototype.renderStarburst = function(ctx, radius, intensity) {
+            const rays_count = this.properties.rays_count;
+            const ray_length = this.properties.ray_length;
+            const ray_thickness = this.properties.ray_thickness;
+            const starburst_intensity = this.properties.starburst_intensity;
+            
+            if (starburst_intensity <= 0 || rays_count <= 0) return;
+            
+            const starburstColor = this.properties.starburst_color || this.properties.main_color || [255, 255, 255];
+            const opacity = starburst_intensity * intensity;
+            const angleStep = 360 / rays_count;
+            
+            const { position_x, position_y, starburst_position_x, starburst_position_y } = this.properties;
+            
+            
+            const starburstCenterX = (starburst_position_x - position_x) * radius * 2;
+            const starburstCenterY = (starburst_position_y - position_y) * radius * 2;
+            
+            ctx.save();
+            ctx.translate(starburstCenterX, starburstCenterY);
+            
+            for (let i = 0; i < rays_count; i++) {
+                const angle = i * angleStep;
+                
+                
+                const { x: rayEndX, y: rayEndY } = VECTOR_UTILS.polarToCartesian(
+                    radius * ray_length * 2, 
+                    angle
+                );
+                
+                
+                const ray = ctx.createLinearGradient(0, 0, rayEndX, rayEndY);
+                
+                
+                ray.addColorStop(0, FORMAT_HELPERS.createColorString(starburstColor, opacity));
+                ray.addColorStop(0.5, FORMAT_HELPERS.createColorString(starburstColor, opacity * 0.5));
+                ray.addColorStop(1, 'rgba(0,0,0,0)');
+                
+                ctx.strokeStyle = ray;
+                ctx.lineWidth = radius * 0.1 * ray_thickness;
+                ctx.beginPath();
+                ctx.moveTo(0, 0);
+                ctx.lineTo(rayEndX, rayEndY);
+                ctx.stroke();
             }
             
             ctx.restore();
-        };
-
-
-        nodeType.prototype.createMainLayers = function(config, radius, intensity, characteristics) {
-            const MC = RENDER_CONSTANTS.MAIN_GLOW;
-            const CC = RENDER_CONSTANTS.COATING;
-            
-            return [
-                {
-                    blend: 'screen',
-                    render: (ctx) => this.createMainGlow(ctx, {
-                        radius,
-                        intensity,
-                        config,
-                        tempAdjust: (this.properties.color_temperature - MC.TEMPERATURE_ADJUSTMENT.BASE) / MC.TEMPERATURE_ADJUSTMENT.SCALE,
-                        stops: MC.OPACITY_STOPS
-                    })
-                },
-                {
-                    blend: 'screen',
-                    render: (ctx) => this.createInnerRing(ctx, radius, intensity)
-                },
-                {
-                    blend: 'overlay',
-                    render: (ctx) => this.createCoatingReflection(ctx, {
-                        radius,
-                        intensity,
-                        config,
-                        coatingQuality: characteristics.coatingQuality,
-                        colorBlend: CC.COLOR_BLEND
-                    })
-                }
-            ];
-        };
-
-
-        nodeType.prototype.renderDiffractionRing = function(ctx, params) {
-            const { radius, intensity, ringIndex, totalRings } = params;
-            const hue = (ringIndex / totalRings) * 360;
-            
-            const ringGlow = this.createSpectralGradient(ctx, {
-                innerRadius: radius * 0.95,
-                outerRadius: radius,
-                hue,
-                intensity
-            });
-            
-            this.drawGlow(ctx, ringGlow, radius);
-        };
-
-
-        nodeType.prototype.renderAtmosphericLayer = function(ctx, params) {
-            const { radius, baseIntensity, scatterIntensity, glowStops } = params;
-            
-            const scatterGlow = ctx.createRadialGradient(0, 0, 0, 0, 0, radius);
-            scatterGlow.addColorStop(0, `rgba(255,255,255,${baseIntensity * glowStops.START * scatterIntensity})`);
-            scatterGlow.addColorStop(0.6, `rgba(255,255,255,${baseIntensity * glowStops.MIDDLE * scatterIntensity})`);
-            scatterGlow.addColorStop(1, 'rgba(0,0,0,0)');
-            
-            this.drawGlow(ctx, scatterGlow, radius);
         };
 
 
@@ -3325,16 +3148,200 @@ app.registerExtension({
             ctx.fill();
         };
 
+        
+        
+        nodeType.prototype.computeSize = function() {
+            
+            let size = LiteGraph.LGraphNode.prototype.computeSize.apply(this, arguments);
 
-        nodeType.prototype.onPropertyChanged = function(property, value) {
-            if (property === "starburst_color") {
+            
+            const minWidth = 200; 
+            const minHeight = 200; 
+            size[0] = Math.max(minWidth, size[0]);
+            size[1] = Math.max(minHeight, size[1]);
 
-                this.setDirtyCanvas(true);
-                if (this.graph) {
-                    this.graph.setDirtyCanvas(true, true);
-                }
+            return size;
+        };
+
+        
+        nodeType.prototype._cachedCanvas = null;
+        nodeType.prototype._lastRenderConfig = null;
+
+        
+        nodeType.prototype.optimizeBase64Image = function(canvas) {
+            try {
+                
+                return canvas.toDataURL('image/png');
+            } catch (e) {
+                console.warn('Base64 optimization error:', e);
+                return null;
             }
         };
 
+        
+        nodeType.prototype.updateWidgetValues = function() {
+            if (!this.widgets) return;
+
+            const updates = {};
+            this.widgets.forEach(w => {
+                if (w.name in this.properties) {
+                    if (w.name === 'canvas_image') {
+                        
+                        if (this._cachedCanvas) {
+                            const optimizedBase64 = this.optimizeBase64Image(this._cachedCanvas);
+                            if (optimizedBase64) {
+                                updates[w.name] = optimizedBase64;
+                            }
+                        }
+                    } else {
+                        updates[w.name] = this.properties[w.name];
+                    }
+                }
+            });
+
+            
+            requestAnimationFrame(() => {
+                Object.entries(updates).forEach(([name, value]) => {
+                    const widget = this.widgets.find(w => w.name === name);
+                    if (widget) {
+                        widget.value = value;
+                    }
+                });
+
+                if (this.graph) {
+                    this.graph.change();
+                }
+            });
+        };
+
+        
+        const originalDrawPreviewArea = nodeType.prototype.drawPreviewArea;
+        nodeType.prototype.drawPreviewArea = function(ctx) {
+            if (!this._updateThrottleTimeout) {
+                this._updateThrottleTimeout = setTimeout(() => {
+                    this._updateThrottleTimeout = null;
+                    this.updateWidgetValues();
+                }, 500);
+            }
+            
+            return originalDrawPreviewArea.call(this, ctx);
+        };
+
+        
+        const colorCache = new Map();
+        const maxCacheSize = 100;
+
+        nodeType.prototype.getCachedColor = function(color, format = 'hex') {
+            const key = `${color}_${format}`;
+            if (colorCache.has(key)) {
+                return colorCache.get(key);
+            }
+
+            let result;
+            if (format === 'hex') {
+                result = this.rgbToHex(color);
+            } else {
+                
+                result = color;
+            }
+
+            if (colorCache.size >= maxCacheSize) {
+                const firstKey = colorCache.keys().next().value;
+                colorCache.delete(firstKey);
+            }
+            colorCache.set(key, result);
+            return result;
+        };
+
+        nodeType.prototype.serialize = function() {
+            const serialized = LiteGraph.LGraphNode.prototype.serialize.call(this);
+            
+            
+            const essentialProperties = {
+                flare_type: this.properties.flare_type || "50MM_PRIME",
+                position_x: this.properties.position_x || 0.5,
+                position_y: this.properties.position_y || 0.5,
+                size: this.properties.size || 1.0,
+                size_x: this.properties.size_x || 1.0,
+                size_y: this.properties.size_y || 1.0,
+                intensity: this.properties.intensity || 1.0,
+                rotation: this.properties.rotation || 0,
+                blend_mode: this.properties.blend_mode || "screen",
+                main_color: this.properties.main_color,
+                secondary_color: this.properties.secondary_color,
+                ghost_color: this.properties.ghost_color,
+                starburst_color: this.properties.starburst_color
+            };
+
+            serialized.properties = essentialProperties;
+
+            
+            if (serialized.widgets_values) {
+                serialized.widgets_values = serialized.widgets_values.filter((value, index) => {
+                    const widget = this.widgets[index];
+                    return widget && widget.name !== 'canvas_image';
+                });
+            }
+
+            return serialized;
+        };
+
+        
+        nodeType.prototype.configure = function(info) {
+            
+            if (!LiteGraph.LGraphNode.prototype.configure.call(this, info)) {
+                return false;
+            }
+            
+            
+            Object.entries(DEFAULT_WIDGET_VALUES).forEach(([key, defaultValue]) => {
+                if (!(key in this.properties)) {
+                    this.properties[key] = defaultValue;
+                }
+            });
+
+            
+            if (!this._cachedCanvas) {
+                this._cachedCanvas = document.createElement('canvas');
+            }
+
+            
+            if (this.widgets) {
+                this.widgets.forEach(w => {
+                    if (w.name in this.properties) {
+                        w.value = this.properties[w.name];
+                    }
+                });
+            }
+
+            return true;
+        };
+
+        
+        nodeType.prototype.beforeQueued = function(queue) {
+            
+            if (!this.widgets || !this.properties) {
+                return false;
+            }
+
+            
+            const canvasImageWidget = this.widgets.find(w => w.name === 'canvas_image');
+            if (canvasImageWidget && this._cachedCanvas) {
+                const base64Image = this.optimizeBase64Image(this._cachedCanvas);
+                if (base64Image) {
+                    canvasImageWidget.value = base64Image;
+                }
+            }
+
+            
+            for (const widget of this.widgets) {
+                if (widget.name in this.properties && widget.value === undefined) {
+                    console.warn(`Widget ${widget.name} value is not ready`);
+                    return false;
+                }
+            }
+
+            return true;
+        };
     }
 });

@@ -19,7 +19,7 @@ app.registerExtension({
         };
 
         prototype.createWidget = function() {
-            const widget = ComfyWidgets.STRING(this, "output", ["ANY", { multiline: true, readonly: true }], app);
+            const widget = ComfyWidgets.STRING(this, "output", ["STRING", { multiline: true, readonly: true }], app);
             this.showValueWidget = widget.widget;
             
             const self = this;
@@ -39,8 +39,8 @@ app.registerExtension({
             inputEl.id = inputEl.id || `inputEl-${this.id}`;
             const currentFont = this.fonts[this.selectedFontIndex] || 'Arial';
             
-            const toolbarHeight = 40;
-            const padding = 5;
+            const toolbarHeight = 10;
+            const padding = 1;
             
             const currentStyle = {
                 fontSize: inputEl.style.fontSize || '14px',
@@ -70,7 +70,7 @@ app.registerExtension({
                 left: ${padding}px;
                 right: ${padding}px;
                 top: ${toolbarHeight + padding}px;
-                bottom: ${padding}px;
+                height: calc(100% - ${toolbarHeight + padding + 10}px);
                 width: calc(100% - ${padding * 2}px);
                 overflow-y: auto;
                 overflow-x: hidden;

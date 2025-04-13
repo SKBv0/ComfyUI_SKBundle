@@ -1,16 +1,11 @@
 import { SVG, STYLES } from './NodeDesignConstants.js';
-
 const ButtonManager = {
     isInitialized: false,
     buttonContainer: null,
-    contextMenu: null,
     isPermanent: true,
-    initialX: 0,
-    initialY: 0,
     dragStartX: 0,
     dragStartY: 0,
     isDragging: false,
-    hasShownTooltip: false,
     boundOnDragging: null,
     boundOnDragEnd: null,
     undoStack: [],
@@ -19,40 +14,35 @@ const ButtonManager = {
     colorPicker: null,
     bgColorPicker: null,
     isUpdatingPickers: false,
-
+    isVisible: false,
+    isClosedByUser: false,
     init() {
         if (this.isInitialized) {
             return;
         }
-
         const style = document.createElement('style');
         style.textContent = STYLES;
         document.head.appendChild(style);
-
         this.buttonContainer = document.createElement('div');
-        this.buttonContainer.id = 'alignment-buttons';
+        this.buttonContainer.id = 'nd-alignment-buttons';
         this.buttonContainer.style.position = 'fixed';
         this.buttonContainer.style.zIndex = '9999';
-
-        this.restorePosition();
-
+        this.buttonContainer.style.left = '0px';
+        this.buttonContainer.style.top = '0px';
+        this.buttonContainer.style.visibility = 'hidden';
         document.body.appendChild(this.buttonContainer);
-
         this.boundOnDragging = this.onDragging.bind(this);
         this.boundOnDragEnd = this.onDragEnd.bind(this);
-
         this.buttonContainer.addEventListener('mousedown', this.onDragStart.bind(this));
         document.addEventListener('mousemove', this.boundOnDragging);
         document.addEventListener('mouseup', this.boundOnDragEnd);
-
         this.createButtons();
-
+        this.setupContextMenu();
         this.isInitialized = true;
         this.setInitialVisibility();
         this.initUndoRedo();
         this.updateToggleButton();
     },
-
     initUndoRedo() {
         document.addEventListener('keydown', (e) => {
             if (e.ctrlKey || e.metaKey) {
@@ -66,7 +56,6 @@ const ButtonManager = {
             }
         });
     },
-
     addToUndoStack(action) {
         this.undoStack.push(action);
         if (this.undoStack.length > this.maxUndoStackSize) {
@@ -75,51 +64,49 @@ const ButtonManager = {
         this.redoStack = [];
         this.updateUndoRedoButtons();
     },
-
+    executeAction(fromStack, toStack, actionMethod) {
+        if (fromStack.length === 0) return;
+        const action = fromStack.pop();
+        try {
+            if (action && typeof action[actionMethod] === 'function') {
+                action[actionMethod]();
+                toStack.push(action);
+            } else {
+                console.warn(`Invalid action or missing ${actionMethod} method`);
+                return;
+            }
+            try {
+                this.updateCanvas();
+            } catch (canvasError) {
+                console.warn(`Error updating canvas after ${actionMethod}:`, canvasError);
+            }
+        } catch (error) {
+            console.warn(`Error during ${actionMethod} operation:`, error);
+            fromStack.push(action);
+        } finally {
+            this.updateUndoRedoButtons();
+        }
+    },
     undo() {
-        if (this.undoStack.length > 0) {
-            const action = this.undoStack.pop();
-            try {
-                action.undo();
-                this.redoStack.push(action);
-                this.updateCanvas();
-            } catch (error) {
-                this.undoStack.push(action);
-            } finally {
-                this.updateUndoRedoButtons();
-            }
-        }
+        this.executeAction(this.undoStack, this.redoStack, 'undo');
     },
-
     redo() {
-        if (this.redoStack.length > 0) {
-            const action = this.redoStack.pop();
-            try {
-                action.redo();
-                this.undoStack.push(action);
-                this.updateCanvas();
-            } catch (error) {
-                this.redoStack.push(action);
-            } finally {
-                this.updateUndoRedoButtons();
-            }
-        }
+        this.executeAction(this.redoStack, this.undoStack, 'redo');
     },
-
     updateUndoRedoButtons() {
         const undoButton = document.getElementById('undo');
         const redoButton = document.getElementById('redo');
         if (undoButton) undoButton.disabled = this.undoStack.length === 0;
         if (redoButton) redoButton.disabled = this.redoStack.length === 0;
     },
-
     createButtons() {
         const colorPickerContainer = document.createElement('div');
-        colorPickerContainer.classList.add('color-picker-container');
-        
-        this.createColorPickers(colorPickerContainer);
+        colorPickerContainer.classList.add('nd-color-picker-container');
+        this.colorPicker = this.createSingleColorPicker('node-color-picker', 'Select Node Color', this.onNodeColorChange.bind(this));
+        this.bgColorPicker = this.createSingleColorPicker('node-bg-color-picker', 'Select Node Background Color', this.onNodeBgColorChange.bind(this));
+        colorPickerContainer.appendChild(this.colorPicker);
+        colorPickerContainer.appendChild(this.bgColorPicker);
         this.buttonContainer.appendChild(colorPickerContainer);
-
         const buttons = this.getButtons();
         buttons.forEach(btn => {
             if (btn.type === 'divider') {
@@ -129,27 +116,34 @@ const ButtonManager = {
             }
         });
     },
-
     createDivider() {
         const divider = document.createElement('div');
-        divider.classList.add('divider');
+        divider.classList.add('nd-divider');
         divider.addEventListener('mousedown', this.onDragStart.bind(this));
         this.buttonContainer.appendChild(divider);
     },
-
     createButton(btn) {
         const button = document.createElement('button');
         button.id = btn.id;
-        button.classList.add('custom-button');
+        button.classList.add('nd-button');
         button.innerHTML = SVG[btn.id] || '';
         button.title = this.getButtonTitle(btn.id);
         button.addEventListener('click', (e) => {
-            btn.action.call(this, e);
-            this.updateCanvas();
+            try {
+                if (typeof btn.action === 'function') {
+                    btn.action.call(this, e);
+                }
+                try {
+                    this.updateCanvas();
+                } catch (canvasError) {
+                    console.warn(`Error updating canvas after button click:`, canvasError);
+                }
+            } catch (error) {
+                console.warn(`Error executing action for button ${btn.id}:`, error);
+            }
         });
         this.buttonContainer.appendChild(button);
     },
-
     getButtonTitle(buttonId) {
         const titles = {
             alignLeft: 'Align Left',
@@ -170,36 +164,38 @@ const ButtonManager = {
         };
         return titles[buttonId] || '';
     },
-
     getButtons() {
         return [
-            { id: 'alignLeft', action: this.alignLeft },
-            { id: 'alignCenterHorizontally', action: this.alignCenterHorizontally },
-            { id: 'alignRight', action: this.alignRight },
-            { id: 'alignTop', action: this.alignTop },
-            { id: 'alignCenterVertically', action: this.alignCenterVertically },
-            { id: 'alignBottom', action: this.alignBottom },
+            { id: 'alignLeft', action: () => this._handleAlignmentAction('alignLeft') },
+            { id: 'alignCenterHorizontally', action: () => this._handleAlignmentAction('alignCenterHorizontally') },
+            { id: 'alignRight', action: () => this._handleAlignmentAction('alignRight') },
+            { id: 'alignTop', action: () => this._handleAlignmentAction('alignTop') },
+            { id: 'alignCenterVertically', action: () => this._handleAlignmentAction('alignCenterVertically') },
+            { id: 'alignBottom', action: () => this._handleAlignmentAction('alignBottom') },
+            { id: 'equalWidth', action: () => this._handleAlignmentAction('equalWidth') },
+            { id: 'equalHeight', action: () => this._handleAlignmentAction('equalHeight') },
             { id: 'horizontalDistribution', action: this.horizontalDistribution },
             { id: 'verticalDistribution', action: this.verticalDistribution },
-            { id: 'equalWidth', action: this.equalWidth },
-            { id: 'equalHeight', action: this.equalHeight },
             { id: 'undo', action: this.undo },
             { id: 'redo', action: this.redo },
             { id: 'smartAlign', action: this.smartAlign },
             { id: 'treeView', action: this.treeView },
-            { id: 'toggleMode', action: this.toggleMode }
+            { id: 'toggleMode', action: this.toggleMode },
+            { type: 'divider' },
+            { id: 'close', action: this.close }
         ];
     },
-
     toggleMode() {
         this.isPermanent = !this.isPermanent;
         localStorage.setItem('NodeAlignerIsPermanent', this.isPermanent ? '1' : '0');
-        this.updateToggleButton();
         if (!this.isPermanent) {
-            this.hide();
+            const selectedNodes = this.getSelectedNodes();
+            if (selectedNodes.length < 2) {
+                this.hide();
+            }
         }
+        this.updateToggleButton();
     },
-
     updateToggleButton() {
         const toggleButton = document.getElementById('toggleMode');
         if (toggleButton) {
@@ -207,70 +203,59 @@ const ButtonManager = {
             toggleButton.title = this.isPermanent ? 'Show on selection' : 'Show permanently';
         }
     },
-
-    createTooltip() {
-        const tooltip = document.createElement('div');
-        tooltip.id = 'tooltip';
-        this.buttonContainer.appendChild(tooltip);
-
-        if (!this.hasShownTooltip) {
-            this.buttonContainer.addEventListener('mouseenter', () => {
-                if (!this.hasShownTooltip) {
-                    setTimeout(() => {
-                        tooltip.style.display = 'block';
-                        this.hasShownTooltip = true;
-                    }, 1000);
-                }
-            });
-
-            this.buttonContainer.addEventListener('mouseleave', () => {
-                tooltip.remove();
-            });
-        }
-    },
-
     setInitialVisibility() {
-        let isPermanent = localStorage.getItem('NodeAlignerIsPermanent');
-        if (isPermanent !== null) {
-            this.isPermanent = isPermanent === '1';
+        const isVisible = localStorage.getItem('NodeDesignVisible') === 'true';
+        const isPermanent = localStorage.getItem('NodeAlignerIsPermanent') === '1';
+        this.isVisible = false;
+        this.isPermanent = isPermanent;
+        if (isVisible && isPermanent) {
+            setTimeout(() => { 
+                this.show(); 
+            }, 0);
+        } else {
+            this.buttonContainer.style.visibility = 'hidden';
+            this.buttonContainer.style.display = 'none';
+            this.isVisible = false;
         }
-        this.isPermanent ? this.show() : this.hide();
         this.updateToggleButton();
     },
-
     show() {
-        this.buttonContainer.style.display = 'flex';
+        if (!this.isVisible) {
+            this.isClosedByUser = false;
+            this.restorePosition();
+            this.buttonContainer.style.display = 'flex';
+            this.buttonContainer.style.visibility = 'visible';
+            this.isVisible = true;
+            localStorage.setItem('NodeDesignVisible', 'true');
+            this.updateToggleButton();
+        }
     },
-
     hide() {
-        this.buttonContainer.style.display = 'none';
+        if (!this.isPermanent) {
+            this.buttonContainer.style.display = 'none';
+            this.buttonContainer.style.visibility = 'hidden';
+            this.isVisible = false;
+        }
     },
-
     setPosition(x, y) {
         const containerRect = this.buttonContainer.getBoundingClientRect();
         const windowWidth = window.innerWidth;
         const windowHeight = window.innerHeight;
-        
         if (x + containerRect.width > windowWidth) {
             x = windowWidth - containerRect.width;
         }
-        
         if (x < 0) {
             x = 0;
         }
-        
         if (y + containerRect.height > windowHeight) {
             y = windowHeight - containerRect.height;
         }
-        
         if (y < 0) {
             y = 0;
         }
-        
         this.buttonContainer.style.left = `${x}px`;
         this.buttonContainer.style.top = `${y}px`;
     },
-
     onDragStart(e) {
         if (e.button !== 0) return;
         e.stopPropagation();
@@ -278,7 +263,6 @@ const ButtonManager = {
         this.dragStartX = e.clientX - this.buttonContainer.offsetLeft;
         this.dragStartY = e.clientY - this.buttonContainer.offsetTop;
     },
-
     onDragging(e) {
         if (!this.isDragging) return;
         e.preventDefault();
@@ -288,31 +272,33 @@ const ButtonManager = {
         this.buttonContainer.style.left = `${newX}px`;
         this.buttonContainer.style.top = `${newY}px`;
     },
-
     onDragEnd(e) {
         if (!this.isDragging) return;
         if (e.button !== 0) return;
         e.stopPropagation();
         this.isDragging = false;
-        
         const buttonPosition = {
             left: this.buttonContainer.style.left,
-            top: this.buttonContainer.style.top
+            top: this.buttonContainer.style.top,
+            userPositioned: true
         };
         localStorage.setItem('NodeAlignerButtonPosition', JSON.stringify(buttonPosition));
     },
-
     restorePosition() {
         const savedButtonPosition = JSON.parse(localStorage.getItem('NodeAlignerButtonPosition'));
-        if (savedButtonPosition) {
+        if (savedButtonPosition && savedButtonPosition.userPositioned) {
             this.buttonContainer.style.left = savedButtonPosition.left;
             this.buttonContainer.style.top = savedButtonPosition.top;
         } else {
-            this.buttonContainer.style.left = '20px';
-            this.buttonContainer.style.top = '20px';
+            const windowWidth = window.innerWidth;
+            const containerWidth = this.buttonContainer.offsetWidth || 400;
+            const containerHeight = this.buttonContainer.offsetHeight || 44;
+            const left = Math.max(0, (windowWidth - containerWidth) / 2);
+            const top = window.innerHeight - containerHeight - 20; 
+            this.buttonContainer.style.left = `${left}px`;
+            this.buttonContainer.style.top = `${top}px`;
         }
     },
-
     getSelectedNodes() {
         if (!LGraphCanvas.active_canvas) {
             return [];
@@ -320,15 +306,11 @@ const ButtonManager = {
         const selectedNodesObj = LGraphCanvas.active_canvas.selected_nodes;
         return selectedNodesObj ? Object.values(selectedNodesObj) : [];
     },
-
     updateColorPickers(selectedNodes) {
         if (!selectedNodes || selectedNodes.length === 0) return;
-        
         const firstNode = selectedNodes[0];
         if (!firstNode) return;
-
         this.isUpdatingPickers = true;
-
         try {
             if (this.colorPicker) {
                 const currentColor = firstNode.color || '#ffffff';
@@ -346,599 +328,390 @@ const ButtonManager = {
             this.isUpdatingPickers = false;
         }
     },
-
-    groupNodesByCoordinate(nodes, axis, tolerance = 100) {
-        const groups = [];
-
+    createAlignmentAction(nodes, property, getValue, setValue) {
+        if (nodes.length === 0) return null;
+        const originalStates = {};
         nodes.forEach(node => {
-            let foundGroup = groups.find(group => Math.abs(group[0].pos[axis] - node.pos[axis]) <= tolerance);
-            if (foundGroup) {
-                foundGroup.push(node);
-            } else {
-                groups.push([node]);
-            }
+            originalStates[node.id] = {
+                pos: [...node.pos], 
+                size: [...node.size]  
+            };
         });
-
-        return groups;
-    },
-
-    alignLeft() {
-        const selectedNodes = this.getSelectedNodes();
-        if (selectedNodes.length > 0) {
-            const leftMost = Math.min(...selectedNodes.map(node => node.pos[0]));
-            const action = {
-                undo: () => {
-                    selectedNodes.forEach(node => {
-                        node.pos[0] = node.originalX;
-                    });
-                },
-                redo: () => {
-                    selectedNodes.forEach(node => {
-                        node.originalX = node.pos[0];
-                        node.pos[0] = leftMost;
-                    });
-                }
-            };
-            action.redo();
-            this.addToUndoStack(action);
-            this.updateCanvas();
-        }
-    },
-
-    alignRight() {
-        const selectedNodes = this.getSelectedNodes();
-        if (selectedNodes.length > 0) {
-            const rightMost = Math.max(...selectedNodes.map(node => node.pos[0] + node.size[0]));
-            const action = {
-                undo: () => {
-                    selectedNodes.forEach(node => {
-                        node.pos[0] = node.originalX;
-                    });
-                },
-                redo: () => {
-                    selectedNodes.forEach(node => {
-                        node.originalX = node.pos[0];
-                        node.pos[0] = rightMost - node.size[0];
-                    });
-                }
-            };
-            action.redo();
-            this.addToUndoStack(action);
-            this.updateCanvas();
-        }
-    },
-
-    alignTop() {
-        const selectedNodes = this.getSelectedNodes();
-        if (selectedNodes.length > 0) {
-            const topMost = Math.min(...selectedNodes.map(node => node.pos[1]));
-            const action = {
-                undo: () => {
-                    selectedNodes.forEach(node => {
-                        node.pos[1] = node.originalY;
-                    });
-                },
-                redo: () => {
-                    selectedNodes.forEach(node => {
-                        node.originalY = node.pos[1];
-                        node.pos[1] = topMost;
-                    });
-                }
-            };
-            action.redo();
-            this.addToUndoStack(action);
-            this.updateCanvas();
-        }
-    },
-
-    alignBottom() {
-        const selectedNodes = this.getSelectedNodes();
-        if (selectedNodes.length > 0) {
-            const bottomMost = Math.max(...selectedNodes.map(node => node.pos[1] + node.size[1]));
-            const action = {
-                undo: () => {
-                    selectedNodes.forEach(node => {
-                        node.pos[1] = node.originalY;
-                    });
-                },
-                redo: () => {
-                    selectedNodes.forEach(node => {
-                        node.originalY = node.pos[1];
-                        node.pos[1] = bottomMost - node.size[1];
-                    });
-                }
-            };
-            action.redo();
-            this.addToUndoStack(action);
-            this.updateCanvas();
-        }
-    },
-
-    alignCenterHorizontally() {
-        const selectedNodes = this.getSelectedNodes();
-        if (selectedNodes.length > 0) {
-            const centerY = this.calculateCenterInGroup(selectedNodes, 1);
-            const action = {
-                undo: () => {
-                    selectedNodes.forEach(node => {
-                        node.pos[1] = node.originalY;
-                    });
-                },
-                redo: () => {
-                    selectedNodes.forEach(node => {
-                        node.originalY = node.pos[1];
-                        node.pos[1] = centerY - node.size[1] / 2;
-                    });
-                }
-            };
-            action.redo();
-            this.addToUndoStack(action);
-            this.updateCanvas();
-        }
-    },
-
-    alignCenterVertically() {
-        const selectedNodes = this.getSelectedNodes();
-        if (selectedNodes.length > 0) {
-            const centerX = this.calculateCenterInGroup(selectedNodes, 0);
-            const action = {
-                undo: () => {
-                    selectedNodes.forEach(node => {
-                        node.pos[0] = node.originalX;
-                    });
-                },
-                redo: () => {
-                    selectedNodes.forEach(node => {
-                        node.originalX = node.pos[0];
-                        node.pos[0] = centerX - node.size[0] / 2;
-                    });
-                }
-            };
-            action.redo();
-            this.addToUndoStack(action);
-            this.updateCanvas();
-        }
-    },
-
-    calculateCenterInGroup(group, axis) {
-        const minCoord = Math.min(...group.map(node => node.pos[axis]));
-        const maxCoord = Math.max(...group.map(node => node.pos[axis] + node.size[axis]));
-        return (minCoord + maxCoord) / 2;
-    },
-
-    horizontalDistribution() {
-        const nodes = this.getSelectedNodes();
-        const axis = 0;
-        if (nodes.length > 1) {
-            nodes.sort((a, b) => a.pos[axis] - b.pos[axis]);
-    
-            const min = Math.min(...nodes.map(node => node.pos[axis]));
-            const max = Math.max(...nodes.map(node => node.pos[axis] + node.size[axis]));
-    
-            const totalSize = nodes.reduce((sum, node) => sum + node.size[axis], 0);
-            const spacing = (max - min - totalSize) / (nodes.length - 1);
-    
-            const action = {
-                undo: () => {
-                    nodes.forEach(node => {
-                        node.pos[axis] = node.originalPos;
-                    });
-                },
-                redo: () => {
-                    let current = min;
-                    nodes.forEach(node => {
-                        node.originalPos = node.pos[axis];
-                        node.pos[axis] = current;
-                        current += node.size[axis] + spacing;
-                    });
-                }
-            };
-            action.redo();
-            this.addToUndoStack(action);
-            this.updateCanvas();
-        }
-    },
-
-    verticalDistribution() {
-        const nodes = this.getSelectedNodes();
-    
-        if (nodes.length > 1) {
-            const axis = 1;
-            const otherAxis = 0;
-            const tolerance = 100;
-            const minSpacing = 20;
-    
-            const columns = [];
-    
-            nodes.forEach(node => {
-                let foundColumn = null;
-    
-                for (let column of columns) {
-                    const columnX = column[0].pos[otherAxis];
-    
-                    if (Math.abs(columnX - node.pos[otherAxis]) <= tolerance) {
-                        foundColumn = column;
-                        break;
+        const targetValue = getValue(nodes);
+        return {
+            undo: () => {
+                nodes.forEach(node => {
+                    const originalState = originalStates[node.id];
+                    if (originalState) {
+                        node.pos = [...originalState.pos];
+                        node.size = [...originalState.size];
                     }
-                }
-    
-                if (foundColumn) {
-                    foundColumn.push(node);
-                } else {
-                    columns.push([node]);
-                }
-            });
-    
-            const columnHeights = columns.map(column => {
-                const minY = Math.min(...column.map(node => node.pos[axis]));
-                const maxY = Math.max(...column.map(node => node.pos[axis] + node.size[axis]));
-                return maxY - minY;
-            });
-    
-            const maxColumnHeight = Math.max(...columnHeights);
-            const minFirstNodeY = Math.min(...columns.map(column => column[0].pos[axis]));
-    
-            const action = {
-                undo: () => {
-                    nodes.forEach(node => {
-                        node.pos[axis] = node.originalPos;
-                        node.pos[otherAxis] = node.originalOtherPos;
-                    });
-                },
-                redo: () => {
-                    columns.forEach((column, columnIndex) => {
-                        if (column.length > 1) {
-                            column.sort((a, b) => a.pos[axis] - b.pos[axis]);
-        
-                            const totalSize = column.reduce((sum, node) => sum + node.size[axis], 0);
-        
-                            let spacing = (maxColumnHeight - totalSize) / (column.length - 1);
-                            spacing = Math.max(spacing, minSpacing);
-        
-                            let currentY = minFirstNodeY;
-        
-                            column.forEach((node, idx) => {
-                                node.originalPos = node.pos[axis];
-                                node.originalOtherPos = node.pos[otherAxis];
-                                node.pos[axis] = currentY;
-                                currentY += node.size[axis] + spacing;
-                                node.pos[otherAxis] = column[0].pos[otherAxis];
-                            });
-                        } else if (column.length === 1) {
-                            const node = column[0];
-                            node.originalPos = node.pos[axis];
-                            node.pos[axis] = minFirstNodeY;
-                        }
-                    });
-                }
-            };
-            action.redo();
-            this.addToUndoStack(action);
-            this.updateCanvas();
-        }
-    },
-
-    equalWidth() {
-        this.equalSize(0);
-    },
-
-    equalHeight() {
-        this.equalSize(1);
-    },
-
-    equalSize(axis) {
-        const nodes = this.getSelectedNodes();
-        if (nodes.length > 0) {
-            const maxSize = Math.max(...nodes.map(node => node.size[axis]));
-            const action = {
-                undo: () => {
-                    nodes.forEach(node => {
-                        node.size[axis] = node.originalSize;
-                    });
-                },
-                redo: () => {
-                    nodes.forEach(node => {
-                        node.originalSize = node.size[axis];
-                        node.size[axis] = maxSize;
-                    });
-                }
-            };
-            action.redo();
-            this.addToUndoStack(action);
-            this.updateCanvas();
-        }
-    },
-
-    showTooltip() {
-        if (this.hasShownTooltip) return;
-        const tooltip = document.getElementById('tooltip');
-        tooltip.style.display = 'block';
-        setTimeout(() => {
-            tooltip.style.opacity = '1';
-        }, 10);
-        this.hasShownTooltip = true;
-    },
-
-    hideTooltip() {
-        const tooltip = document.getElementById('tooltip');
-        tooltip.style.opacity = '0';
-        setTimeout(() => {
-            tooltip.style.display = 'none';
-        }, 300);
-    },
-
-    smartAlign() {
-        const selectedNodes = this.getSelectedNodes();
-        if (selectedNodes.length < 2) return;
-
-        const action = {
-            undo: () => selectedNodes.forEach(node => {
-                [node.pos[0], node.pos[1]] = [node.originalX, node.originalY];
-            }),
+                });
+            },
             redo: () => {
-                const bounds = this.getNodesBounds(selectedNodes);
-                const [hSpacing, vSpacing] = [50, 50];
-                const maxWidth = Math.min(2000, bounds.width * 1.5);
-
-                const leftNodes = selectedNodes.filter(node => !node.inputs || node.inputs.length === 0);
-                const rightNodes = selectedNodes.filter(node => !node.outputs || node.outputs.length === 0);
-                let middleNodes = selectedNodes.filter(node => 
-                    (node.inputs && node.inputs.length > 0) && (node.outputs && node.outputs.length > 0)
-                );
-
-                const doubleLinkNodes = this.detectDoubleLinkNodes(middleNodes, leftNodes, rightNodes);
-                middleNodes = middleNodes.filter(node => !doubleLinkNodes.includes(node));
-
-                const nodeOrder = this.analyzeConnections([...middleNodes, ...doubleLinkNodes]);
-                middleNodes.sort((a, b) => nodeOrder.indexOf(a) - nodeOrder.indexOf(b));
-
-                [leftNodes, middleNodes, rightNodes, doubleLinkNodes].forEach(category => 
-                    category.sort((a, b) => a.pos[1] - b.pos[1])
-                );
-
-                let currentY = bounds.top;
-                leftNodes.forEach(node => {
-                    [node.originalX, node.originalY] = node.pos;
-                    node.pos[0] = bounds.left;
-                    node.pos[1] = currentY;
-                    currentY += node.size[1] + vSpacing;
-                });
-
-                let [currentX, rowHeight] = [bounds.left + this.getMaxWidth(leftNodes) + hSpacing, 0];
-                currentY = bounds.top;
-                middleNodes.forEach(node => {
-                    [node.originalX, node.originalY] = node.pos;
-                    if (currentX + node.size[0] > bounds.left + maxWidth) {
-                        currentX = bounds.left + this.getMaxWidth(leftNodes) + hSpacing;
-                        currentY += rowHeight + vSpacing;
-                        rowHeight = 0;
+                nodes.forEach(node => {
+                    const currentPos = [...node.pos];
+                    const currentSize = [...node.size];
+                    const originalState = originalStates[node.id]; 
+                    if (property === 'pos') {
+                        const newValue = setValue.func ? setValue.func(node, targetValue) : targetValue;
+                        const newPos = [...currentPos]; 
+                        newPos[setValue.axis] = newValue;
+                        node.pos = newPos; 
+                    } else if (property === 'size') {
+                        const newSize = [...currentSize]; 
+                        newSize[setValue.axis] = targetValue;
+                        node.size = newSize; 
                     }
-                    node.pos[0] = currentX;
-                    node.pos[1] = currentY;
-                    currentX += node.size[0] + hSpacing;
-                    rowHeight = Math.max(rowHeight, node.size[1]);
                 });
+            }
+        };
+    },
+    applyAction(action) {
+        if (!action) return false;
+        try {
+            if (typeof action.redo !== 'function') {
+                console.warn('Action missing redo method');
+                return false;
+            }
+            action.redo();
+            this.addToUndoStack(action);
+            try {
+                this.updateCanvas();
+            } catch (canvasError) {
+                console.warn('Error updating canvas after applying action:', canvasError);
+            }
+            return true;
+        } catch (error) {
+            console.warn('Error applying action:', error);
+            return false;
+        }
+    },
+    _handleAlignmentAction(actionName) {
+        const config = this.ALIGNMENT_CONFIG[actionName];
+        if (!config) {
+            console.warn("Unknown alignment/equalize action:", actionName);
+            return false;
+        }
 
-                const rightmostMiddleX = currentX;
-                doubleLinkNodes.forEach(node => {
-                    [node.originalX, node.originalY] = node.pos;
-                    node.pos[0] = rightmostMiddleX;
-                    node.pos[1] = currentY;
-                    currentY += node.size[1] + vSpacing;
+        const selectedNodes = this.getSelectedNodes();
+        if (selectedNodes.length === 0) return false;
+
+        const boundValueFunc = typeof config.valueFunc === 'function' ? config.valueFunc.bind(this) : config.valueFunc;
+
+        const action = this.createAlignmentAction(
+            selectedNodes,
+            config.type,
+            boundValueFunc,
+            { axis: config.axis, func: config.transformFunc } 
+        );
+        return this.applyAction(action);
+    },
+    horizontalDistribution() {
+        const selectedNodes = this.getSelectedNodes();
+        const calcResult = this._calculateDistributedPositions(selectedNodes, 0);
+        if (!calcResult) return false;
+
+        const { targetPositions, originalStates } = calcResult;
+        
+        const action = {
+            undo: () => {
+                selectedNodes.forEach(node => {
+                    const originalState = originalStates[node.id];
+                    if (originalState) {
+                        node.pos = [...originalState.pos];
+                        node.size = [...originalState.size];
+                    }
                 });
-
-                currentY = bounds.top;
-                const rightmostX = bounds.left + maxWidth;
-                rightNodes.forEach(node => {
-                    [node.originalX, node.originalY] = node.pos;
-                    node.pos[0] = rightmostX - node.size[0];
-                    node.pos[1] = currentY;
-                    currentY += node.size[1] + vSpacing;
+            },
+            redo: () => {
+                selectedNodes.forEach(node => {
+                    const targetPos = targetPositions[node.id];
+                    if (targetPos) {
+                        node.pos[0] = Number(targetPos[0]) || 0;
+                        node.pos[1] = Number(targetPos[1]) || 0;
+                    }
+                    const originalState = originalStates[node.id];
+                    if (originalState && (node.size[0] !== originalState.size[0] || node.size[1] !== originalState.size[1])) {
+                        node.size = [...originalState.size];
+                    }
                 });
             }
         };
 
-        action.redo();
-        this.addToUndoStack(action);
-        this.updateCanvas();
+        return this.applyAction(action);
     },
+    verticalDistribution() {
+        const selectedNodes = this.getSelectedNodes();
+        const calcResult = this._calculateDistributedPositions(selectedNodes, 1);
+        if (!calcResult) return false;
 
-    detectDoubleLinkNodes(middleNodes, leftNodes, rightNodes) {
-        return middleNodes.filter(node => {
-            const hasLeftInput = node.inputs.some(input => 
-                input.link !== null && leftNodes.some(leftNode => 
-                    leftNode.outputs && leftNode.outputs.some(output => 
-                        output.links && output.links.includes(input.link)
-                    )
-                )
-            );
-            const hasRightInput = node.inputs.some(input => 
-                input.link !== null && rightNodes.some(rightNode => 
-                    rightNode.outputs && rightNode.outputs.some(output => 
-                        output.links && output.links.includes(input.link)
-                    )
-                )
-            );
-            return hasLeftInput && hasRightInput;
+        const { targetPositions, originalStates } = calcResult;
+        
+        const action = {
+            undo: () => {
+                selectedNodes.forEach(node => {
+                    const originalState = originalStates[node.id];
+                    if (originalState) {
+                        node.pos = [...originalState.pos];
+                        node.size = [...originalState.size];
+                    }
+                });
+            },
+            redo: () => {
+                selectedNodes.forEach(node => {
+                    const targetPos = targetPositions[node.id];
+                    if (targetPos) {
+                        node.pos[0] = Number(targetPos[0]) || 0;
+                        node.pos[1] = Number(targetPos[1]) || 0;
+                    }
+                    const originalState = originalStates[node.id];
+                    if (originalState && (node.size[0] !== originalState.size[0] || node.size[1] !== originalState.size[1])) {
+                        node.size = [...originalState.size];
+                    }
+                });
+            }
+        };
+
+        return this.applyAction(action);
+    },
+    smartAlign() {
+        const selectedNodes = this.getSelectedNodes();
+        if (selectedNodes.length < 2) return false;
+        const originalStates = {};
+        selectedNodes.forEach(node => {
+            originalStates[node.id] = {
+                pos: [...node.pos],
+                size: [...node.size]
+            };
         });
+        const analysisResult = this.analyzeConnectionsBFS(selectedNodes);
+        const levels = analysisResult.levels;
+        if (!levels || levels.length === 0) {
+            console.warn("Smart Align: Could not determine node levels.");
+            return false; 
+        }
+        const targetPositions = {};
+        const horizontalSpacing = 100; 
+        const verticalSpacing = 30;   
+        let currentX = originalStates[levels[0][0].id].pos[0]; 
+        let maxColumnHeight = 0;
+        const columnWidths = [];
+        levels.forEach((level, levelIndex) => {
+            let currentColumnWidth = 0;
+            let currentColumnHeight = 0;
+            level.forEach((node, nodeIndex) => {
+                const originalSize = originalStates[node.id].size;
+                currentColumnWidth = Math.max(currentColumnWidth, originalSize[0]);
+                currentColumnHeight += originalSize[1] + (nodeIndex > 0 ? verticalSpacing : 0);
+            });
+            columnWidths[levelIndex] = currentColumnWidth;
+            maxColumnHeight = Math.max(maxColumnHeight, currentColumnHeight);
+        });
+        levels.forEach((level, levelIndex) => {
+            level.sort((a, b) => originalStates[a.id].pos[1] - originalStates[b.id].pos[1]);
+            const levelHeight = level.reduce((sum, node, idx) => sum + originalStates[node.id].size[1] + (idx > 0 ? verticalSpacing : 0), 0);
+            let currentY = originalStates[levels[0][0].id].pos[1] + (maxColumnHeight - levelHeight) / 2;
+            level.forEach(node => {
+                const originalSize = originalStates[node.id].size;
+                const nodeX = currentX + (columnWidths[levelIndex] - originalSize[0]) / 2; 
+                targetPositions[node.id] = [nodeX, currentY];
+                currentY += originalSize[1] + verticalSpacing;
+            });
+            currentX += columnWidths[levelIndex] + horizontalSpacing; 
+        });
+        const action = {
+            undo: () => {
+                selectedNodes.forEach(node => {
+                    const originalState = originalStates[node.id];
+                    if (originalState) {
+                        node.pos = [...originalState.pos];
+                        node.size = [...originalState.size];
+                    }
+                });
+            },
+            redo: () => {
+                selectedNodes.forEach(node => {
+                    const targetPos = targetPositions[node.id];
+                    if (targetPos) {
+                        node.pos = [Number(targetPos[0]) || 0, Number(targetPos[1]) || 0];
+                    }
+                     const originalState = originalStates[node.id];
+                     if (originalState && (node.size[0] !== originalState.size[0] || node.size[1] !== originalState.size[1])) {
+                         node.size = [...originalState.size];
+                     }
+                });
+            }
+        };
+        return this.applyAction(action);
     },
-
-    analyzeConnections(nodes) {
-        const graph = {};
+    analyzeConnectionsBFS(nodes) {
+        const graph = {}; 
+        const inDegree = {}; 
+        const nodeMap = {}; 
         nodes.forEach(node => {
-            graph[node.id] = { node, inputs: [], outputs: [] };
+            const nodeId = node.id;
+            graph[nodeId] = { node, outputs: [] };
+            inDegree[nodeId] = 0;
+            nodeMap[nodeId] = node;
         });
-
         nodes.forEach(node => {
             if (node.inputs) {
                 node.inputs.forEach(input => {
                     if (input.link !== null) {
                         const sourceNode = nodes.find(n => n.outputs && n.outputs.some(o => o.links && o.links.includes(input.link)));
                         if (sourceNode) {
-                            graph[node.id].inputs.push(sourceNode.id);
-                            graph[sourceNode.id].outputs.push(node.id);
+                            const sourceId = sourceNode.id;
+                            const destId = node.id;
+                            if (!graph[sourceId].outputs.includes(destId)) {
+                                graph[sourceId].outputs.push(destId);
+                                inDegree[destId]++;
+                            }
                         }
                     }
                 });
             }
         });
-
-        const visited = new Set();
-        const result = [];
-
-        function dfs(nodeId) {
-            if (visited.has(nodeId)) return;
-            visited.add(nodeId);
-            graph[nodeId].inputs.forEach(dfs);
-            result.push(graph[nodeId].node);
-        }
-
-        Object.keys(graph).forEach(dfs);
-
-        return result;
-    },
-
-    getMaxWidth(nodes) {
-        return nodes.length > 0 ? Math.max(...nodes.map(node => node.size[0])) : 0;
-    },
-
-    getNodesBounds(nodes) {
-        const xs = nodes.map(n => n.pos[0]);
-        const ys = nodes.map(n => n.pos[1]);
-        const rights = nodes.map(n => n.pos[0] + n.size[0]);
-        const bottoms = nodes.map(n => n.pos[1] + n.size[1]);
-        return {
-            left: Math.min(...xs),
-            top: Math.min(...ys),
-            right: Math.max(...rights),
-            bottom: Math.max(...bottoms),
-            width: Math.max(...rights) - Math.min(...xs),
-            height: Math.max(...bottoms) - Math.min(...ys)
-        };
-    },
-
-    distributeEvenly() {
-        const selectedNodes = this.getSelectedNodes();
-        if (selectedNodes.length < 3) return;
-
-        const bounds = this.getNodesBounds(selectedNodes);
-        const totalWidth = selectedNodes.reduce((sum, node) => sum + node.size[0], 0);
-        const spacing = (bounds.width - totalWidth) / (selectedNodes.length - 1);
-
-        const action = {
-            undo: () => {
-                selectedNodes.forEach(node => {
-                    node.pos[0] = node.originalX;
-                });
-            },
-            redo: () => {
-                let currentX = bounds.left;
-                selectedNodes.forEach(node => {
-                    node.originalX = node.pos[0];
-                    node.pos[0] = currentX;
-                    currentX += node.size[0] + spacing;
-                });
-            }
-        };
-
-        action.redo();
-        this.addToUndoStack(action);
-        LGraphCanvas.active_canvas.setDirty(true, true);
-    },
-
-    updateCanvas() {
-        if (LGraphCanvas.active_canvas) {
-            const canvas = LGraphCanvas.active_canvas;
-            const currentOffset = canvas.ds ? {...canvas.ds.offset} : null;
-            const currentScale = canvas.ds ? canvas.ds.scale : null;
-            
-            canvas.setDirty(true, true);
-            const selectedNodes = this.getSelectedNodes();
-            canvas.selectNodes(selectedNodes);
-            if (currentOffset && currentScale) {
-                canvas.ds.offset = currentOffset;
-                canvas.ds.scale = currentScale;
+        const queue = [];
+        for (const nodeId in inDegree) {
+            if (inDegree[nodeId] === 0) {
+                queue.push(nodeId); 
             }
         }
+        const result = []; 
+        const levels = []; 
+        let levelIndex = 0;
+        while (queue.length > 0) {
+            const levelSize = queue.length;
+            const currentLevelNodes = [];
+            for (let i = 0; i < levelSize; i++) {
+                 const u = queue.shift();
+                 const nodeObj = nodeMap[u];
+                 result.push(nodeObj);
+                 currentLevelNodes.push(nodeObj);
+                 if(graph[u]){ 
+                    graph[u].outputs.forEach(v => {
+                         if (inDegree.hasOwnProperty(v)) {
+                             inDegree[v]--;
+                             if (inDegree[v] === 0) {
+                                 queue.push(v); 
+                             }
+                         }
+                     });
+                 }
+            }
+            if (currentLevelNodes.length > 0) {
+                 levels[levelIndex] = currentLevelNodes;
+                 levelIndex++;
+            }
+        }
+        if (result.length !== nodes.length) {
+            console.warn("Cycle detected or disconnected nodes within selection. Layout might be incomplete.");
+            return { sortedNodes: nodes, levels: null }; 
+        }
+        return { sortedNodes: result, levels: levels };
     },
-
-    groupNodesByCoordinate(nodes, axis, tolerance = 50) {
-        const groups = [];
+    getNodesBoundsInScreenCoords(nodes) {
+        if (!nodes || nodes.length === 0 || !LGraphCanvas.active_canvas) {
+            console.warn("getNodesBoundsInScreenCoords: No nodes or active canvas found.");
+            return { left: 10, top: 10, right: 110, bottom: 110, width: 100, height: 100 };
+        }
+        const canvas = LGraphCanvas.active_canvas;
+        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
         nodes.forEach(node => {
-            let foundGroup = groups.find(group => 
-                Math.abs(group[0].pos[axis] - node.pos[axis]) <= tolerance
-            );
-            if (foundGroup) {
-                foundGroup.push(node);
-            } else {
-                groups.push([node]);
+            const nodeGraphX = node.pos[0];
+            const nodeGraphY = node.pos[1];
+            const nodeWidth = node.size[0];
+            const nodeHeight = node.size[1];
+            try {
+                const topLeft = canvas.convertOffsetToCanvas([nodeGraphX, nodeGraphY]);
+                const bottomRight = canvas.convertOffsetToCanvas([nodeGraphX + nodeWidth, nodeGraphY + nodeHeight]);
+                minX = Math.min(minX, topLeft[0]);
+                minY = Math.min(minY, topLeft[1]);
+                maxX = Math.max(maxX, bottomRight[0]);
+                maxY = Math.max(maxY, bottomRight[1]);
+            } catch (e) {
+                console.error("Error converting node coordinates:", e, node);
             }
         });
-        return groups;
+        if (minX === Infinity) {
+            console.warn("getNodesBoundsInScreenCoords: Could not calculate valid screen coordinates.");
+            return { left: 10, top: 10, right: 110, bottom: 110, width: 100, height: 100 };
+        }
+        return {
+            left: minX,
+            top: minY,
+            right: maxX,
+            bottom: maxY,
+            width: maxX - minX,
+            height: maxY - minY
+        };
     },
-
-    adjustSpacingBetweenGroups(groups, axis) {
-        const otherAxis = axis === 0 ? 1 : 0;
-        groups.sort((a, b) => a[0].pos[axis] - b[0].pos[axis]);
-
-        for (let i = 1; i < groups.length; i++) {
-            const prevGroup = groups[i - 1];
-            const currentGroup = groups[i];
-            const prevGroupMax = Math.max(...prevGroup.map(n => n.pos[axis] + n.size[axis]));
-            const currentGroupMin = Math.min(...currentGroup.map(n => n.pos[axis]));
-            const desiredSpacing = 50;
-
-            const adjustment = prevGroupMax + desiredSpacing - currentGroupMin;
-            currentGroup.forEach(node => {
-                node.pos[axis] += adjustment;
-            });
+    updateCanvas() {
+        if (!LGraphCanvas.active_canvas) return;
+        try {
+            const canvas = LGraphCanvas.active_canvas;
+            canvas.setDirty(true, true);
+        } catch (e) {
+            console.warn("Error marking canvas dirty: ", e);
         }
     },
-
     treeView() {
         const selectedNodes = this.getSelectedNodes();
-        if (selectedNodes.length < 2) return;
-
+        if (selectedNodes.length < 2) return false; 
+        const originalStates = {};
+        selectedNodes.forEach(node => {
+            originalStates[node.id] = {
+                pos: [...node.pos],
+                size: [...node.size]
+            };
+        });
+        const rootNode = this.findRootNode(selectedNodes);
+        if (!rootNode) {
+            console.warn("Tree View: Could not find a root node.");
+            return false; 
+        }
+        const targetPositions = {};
+        const levels = this.buildSimpleHierarchy(rootNode, selectedNodes);
+        const nodeWidth = Math.max(...selectedNodes.map(node => originalStates[node.id].size[0]));
+        const nodeHeight = Math.max(...selectedNodes.map(node => originalStates[node.id].size[1]));
+        const horizontalSpacing = nodeWidth * 1.5;
+        const verticalSpacing = nodeHeight * 1.5; 
+        const rootOriginalPos = originalStates[rootNode.id].pos;
+        levels.forEach((level, levelIndex) => {
+            const levelWidth = (level.length - 1) * horizontalSpacing;
+            const startX = rootOriginalPos[0]; 
+            level.forEach((node, nodeIndex) => {
+                const targetX = startX + (nodeIndex - (level.length - 1) / 2) * horizontalSpacing;
+                const targetY = rootOriginalPos[1] + levelIndex * verticalSpacing;
+                targetPositions[node.id] = [targetX, targetY];
+            });
+        });
         const action = {
             undo: () => selectedNodes.forEach(node => {
-                [node.pos[0], node.pos[1]] = [node.originalX, node.originalY];
+                 const originalState = originalStates[node.id];
+                 if (originalState) {
+                     node.pos = [...originalState.pos];
+                     node.size = [...originalState.size];
+                 }
             }),
             redo: () => {
-                const rootNode = this.findRootNode(selectedNodes);
-                if (!rootNode) return;
-
-                const levels = this.buildSimpleHierarchy(rootNode, selectedNodes);
-                const nodeWidth = Math.max(...selectedNodes.map(node => node.size[0]));
-                const nodeHeight = Math.max(...selectedNodes.map(node => node.size[1]));
-                const horizontalSpacing = nodeWidth * 1.5;
-                const verticalSpacing = nodeHeight * 2;
-
-                levels.forEach((level, levelIndex) => {
-                    const levelWidth = (level.length - 1) * horizontalSpacing;
-                    const startX = rootNode.pos[0] - levelWidth / 2;
-
-                    level.forEach((node, nodeIndex) => {
-                        [node.originalX, node.originalY] = node.pos;
-                        node.pos[0] = startX + nodeIndex * horizontalSpacing;
-                        node.pos[1] = rootNode.pos[1] + levelIndex * verticalSpacing;
-                    });
+                selectedNodes.forEach(node => {
+                    const targetPos = targetPositions[node.id];
+                    if (targetPos) {
+                        node.pos = [Number(targetPos[0]) || 0, Number(targetPos[1]) || 0];
+                    }
                 });
             }
         };
-
-        action.redo();
-        this.addToUndoStack(action);
-        this.updateCanvas();
+        return this.applyAction(action);
     },
-
     findRootNode(nodes) {
         return nodes.find(node => !node.inputs || node.inputs.every(input => input.link === null));
     },
-
     buildSimpleHierarchy(rootNode, allNodes) {
         const levels = [[rootNode]];
         const visited = new Set([rootNode.id]);
-
         let currentLevel = [rootNode];
         while (currentLevel.length > 0) {
             const nextLevel = [];
@@ -958,115 +731,170 @@ const ButtonManager = {
             }
             currentLevel = nextLevel;
         }
-
         return levels;
     },
-
-    createColorPickers() {
-        const colorPickerContainer = document.createElement('div');
-        colorPickerContainer.classList.add('color-picker-container');
-        this.colorPicker = this.createSingleColorPicker('node-color-picker', 'Select Node Color', this.onNodeColorChange.bind(this));
-
-        this.bgColorPicker = this.createSingleColorPicker('node-bg-color-picker', 'Select Node Background Color', this.onNodeBgColorChange.bind(this));
-
-        colorPickerContainer.appendChild(this.colorPicker);
-        colorPickerContainer.appendChild(this.bgColorPicker);
-        this.buttonContainer.appendChild(colorPickerContainer);
-    },
-
     createSingleColorPicker(id, title, changeHandler) {
         const picker = document.createElement('input');
         picker.type = 'color';
         picker.id = id;
-        picker.classList.add('color-picker');
+        picker.classList.add('nd-color-picker');
         picker.title = title;
-        
         picker.addEventListener('input', changeHandler);
         picker.addEventListener('change', changeHandler);
-        
         return picker;
     },
-
+    applyNodeColorChange(property, color) {
+        if (this.isUpdatingPickers) return;
+        const selectedNodes = this.getSelectedNodes();
+        if (selectedNodes.length > 0) {
+            selectedNodes.forEach(node => {
+                node[property] = color;
+            });
+            if (LGraphCanvas.active_canvas) {
+                LGraphCanvas.active_canvas.setDirty(true, true);
+            }
+        }
+    },
     onNodeColorChange(event) {
-        if (this.isUpdatingPickers) return;
-        
         const color = event.target.value;
-        const selectedNodes = this.getSelectedNodes();
-        if (selectedNodes.length > 0) {
-            selectedNodes.forEach(node => {
-                node.color = color;
-            });
-            if (LGraphCanvas.active_canvas) {
-                LGraphCanvas.active_canvas.setDirty(true, true);
-            }
-        }
+        
+        const validColor = color.length === 4 ? 
+            `#${color[1]}${color[1]}${color[2]}${color[2]}${color[3]}${color[3]}` : 
+            color;
+        this.applyNodeColorChange('color', validColor);
     },
-
     onNodeBgColorChange(event) {
-        if (this.isUpdatingPickers) return;
-        
         const color = event.target.value;
-        const selectedNodes = this.getSelectedNodes();
-        if (selectedNodes.length > 0) {
-            selectedNodes.forEach(node => {
-                node.bgcolor = color;
-            });
-            if (LGraphCanvas.active_canvas) {
-                LGraphCanvas.active_canvas.setDirty(true, true);
-            }
-        }
+        
+        const validColor = color.length === 4 ? 
+            `#${color[1]}${color[1]}${color[2]}${color[2]}${color[3]}${color[3]}` : 
+            color;
+        this.applyNodeColorChange('bgcolor', validColor);
     },
-
     pollForCanvas() {
         const canvas = document.querySelector('canvas#graph-canvas');
         if (canvas) {
             ButtonManager.init();
-            
             canvas.addEventListener('click', (event) => {
-                if (!ButtonManager.isPermanent) {
-                    const selectedNodes = ButtonManager.getSelectedNodes();
-                    
-                    if (selectedNodes.length >= 2) {
-                        const rect = canvas.getBoundingClientRect();
-                        const x = event.clientX - rect.left;
-                        const y = event.clientY - rect.top;
+                const selectedNodes = this.getSelectedNodes();
+                if (!this.isPermanent) {
+                    if (!this.isClosedByUser && selectedNodes.length >= 2) {
+                        this.show();
+                        const nodesBounds = this.getNodesBoundsInScreenCoords(selectedNodes);
+                        const containerWidth = this.buttonContainer.offsetWidth || 400;
+                        const containerHeight = this.buttonContainer.offsetHeight || 44;
                         
-                        ButtonManager.show();
-                        ButtonManager.setPosition(x, Math.max(y - 40, 0));
+                        let left = nodesBounds.left + (nodesBounds.width / 2) - (containerWidth / 2);
+                        let top = nodesBounds.bottom + 50;
+                        
+                        this.setPosition(left, top);
+                        
                     } else {
-                        ButtonManager.hide();
+                        this.hide();
+                    }
+                } else {
+                    if (!this.isClosedByUser && !this.isVisible) {
+                        this.show();
                     }
                 }
+                this.updateColorPickers(selectedNodes);
             });
         } else if (attempts < maxAttempts) {
             attempts++;
-            setTimeout(pollForCanvas, 1000);
+            setTimeout(this.pollForCanvas.bind(this), 1000);
         }
     },
-};
-
-let attempts = 0;
-const maxAttempts = 10;
-
-function pollForCanvas() {
-    const canvas = document.querySelector('canvas#graph-canvas');
-    if (canvas) {
-        ButtonManager.init();
-        canvas.addEventListener('click', function (event) {
-            if (!ButtonManager.isPermanent) {
-                const selectedNodes = ButtonManager.getSelectedNodes();
-                if (selectedNodes.length >= 2) {
-                    ButtonManager.show();
-                    ButtonManager.setPosition(event.layerX, event.layerY - 40);
-                } else {
-                    ButtonManager.hide();
+    setupContextMenu() {
+        const onContextMenu = LGraphCanvas.prototype.getCanvasMenuOptions;
+        LGraphCanvas.prototype.getCanvasMenuOptions = function() {
+            const options = onContextMenu.call(this);
+            options.push(null);
+            options.push({
+                content: ButtonManager.isVisible ? "Hide Node Design Tool" : "Show Node Design Tool",
+                callback: () => {
+                    if (ButtonManager.isVisible) {
+                        ButtonManager.close();
+                    } else {
+                        ButtonManager.show(); 
+                        ButtonManager.isPermanent = true;
+                        localStorage.setItem('NodeAlignerIsPermanent', '1');
+                        ButtonManager.updateToggleButton();
+                    }
                 }
-            }
-        });
-    } else if (attempts < maxAttempts) {
-        attempts++;
-        setTimeout(pollForCanvas, 1000);
-    }
-}
+            });
+            return options;
+        };
+    },
+    close() {
+        this.buttonContainer.style.display = 'none';
+        this.buttonContainer.style.visibility = 'hidden';
+        this.isVisible = false;
+        localStorage.setItem('NodeDesignVisible', 'false');
+        localStorage.removeItem('NodeAlignerButtonPosition');
+        this.isClosedByUser = true;
+        this.isPermanent = false;
+        this.updateToggleButton();
+    },
+    
+    ALIGNMENT_CONFIG: {
+        alignLeft: { type: 'pos', axis: 0, valueFunc: nodes => Math.min(...nodes.map(n => n.pos[0])), transformFunc: (n, v) => v },
+        alignRight: { type: 'pos', axis: 0, valueFunc: nodes => Math.max(...nodes.map(n => n.pos[0] + n.size[0])), transformFunc: (n, v) => v - n.size[0] },
+        alignTop: { type: 'pos', axis: 1, valueFunc: nodes => Math.min(...nodes.map(n => n.pos[1])), transformFunc: (n, v) => v },
+        alignBottom: { type: 'pos', axis: 1, valueFunc: nodes => Math.max(...nodes.map(n => n.pos[1] + n.size[1])), transformFunc: (n, v) => v - n.size[1] },
+        alignCenterHorizontally: { type: 'pos', axis: 1, valueFunc: function(nodes) { return this.calculateCenterInGroup(nodes, 1); }, transformFunc: (n, v) => v - n.size[1] / 2 },
+        alignCenterVertically: { type: 'pos', axis: 0, valueFunc: function(nodes) { return this.calculateCenterInGroup(nodes, 0); }, transformFunc: (n, v) => v - n.size[0] / 2 },
+        equalWidth: { type: 'size', axis: 0, valueFunc: nodes => Math.max(...nodes.map(n => n.size[0])) },
+        equalHeight: { type: 'size', axis: 1, valueFunc: nodes => Math.max(...nodes.map(n => n.size[1])) }
+    },
+    calculateCenterInGroup(group, axis) {
+        const minCoord = Math.min(...group.map(node => node.pos[axis]));
+        const maxCoord = Math.max(...group.map(node => node.pos[axis] + node.size[axis]));
+        return (minCoord + maxCoord) / 2;
+    },
+    _calculateDistributedPositions(nodes, axis) {
+        if (nodes.length < 2) return null;
 
-pollForCanvas();
+        const originalStates = {};
+        nodes.forEach(node => {
+            originalStates[node.id] = {
+                pos: [...node.pos],
+                size: [...node.size]
+            };
+        });
+
+        const analysisResult = this.analyzeConnectionsBFS(nodes);
+        let flowSortedNodes = analysisResult.sortedNodes;
+        const otherAxis = axis === 0 ? 1 : 0;
+
+        if (!flowSortedNodes || flowSortedNodes.length !== nodes.length) {
+            console.warn(`Distribution axis ${axis}: Could not determine flow order. Falling back to position-based sorting.`);
+            flowSortedNodes = [...nodes].sort((a, b) => a.pos[axis] - b.pos[axis]);
+        }
+
+        const minCoord = Math.min(...flowSortedNodes.map(node => originalStates[node.id].pos[axis]));
+        const maxCoord = Math.max(...flowSortedNodes.map(node => originalStates[node.id].pos[axis] + originalStates[node.id].size[axis]));
+        const totalAvailableSpace = maxCoord - minCoord;
+        const totalNodesSize = flowSortedNodes.reduce((sum, node) => sum + originalStates[node.id].size[axis], 0);
+
+        const nodeCount = flowSortedNodes.length;
+        const totalGaps = nodeCount - 1;
+        const equalGap = totalGaps > 0 
+            ? Math.max(0, (totalAvailableSpace - totalNodesSize) / totalGaps)
+            : 0;
+
+        const targetPositions = {};
+        let currentCoord = minCoord;
+        
+        flowSortedNodes.forEach(node => {
+            const originalPos = originalStates[node.id].pos;
+            const targetPos = [...originalPos]; 
+            targetPos[axis] = currentCoord;
+            targetPositions[node.id] = targetPos;
+            currentCoord += originalStates[node.id].size[axis] + equalGap;
+        });
+
+        return { targetPositions, originalStates, flowSortedNodes };
+    },
+};let attempts = 0;
+const maxAttempts = 10;
+ButtonManager.pollForCanvas();

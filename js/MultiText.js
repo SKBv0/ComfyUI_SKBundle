@@ -1,221 +1,21 @@
 import { app } from "../../../scripts/app.js";
 import { ComfyWidgets } from "../../../scripts/widgets.js";
+import {
+    defaultPresets,
+    defaultTemplates,
+    defaultThemeConfig,
+    injectDialogCSS,
+    DialogUtils
+} from "./MultiTextDefaults.js";
 
 const THEME = {
-    colors: {
-        bg: "#18181B",
-        bgHover: "#27272A",
-        bgActive: "#3F3F46",
-        accent: "#8B5CF6",
-        accentLight: "#A78BFA",
-        text: "#F4F4F5",
-        textDim: "#A1A1AA",
-        border: "#27272A",
-        surface: {
-            base: "#18181B",
-            hover: "#27272A",
-            active: "#3F3F46"
-        }
-    },
-    sizes: {
-        margin: 12,
-        textHeight: 42,
-        borderRadius: 8,
-        fontSize: {
-            small: 12,
-            normal: 14,
-            title: 16,
-            large: 18
-        },
-        spacing: {
-            xs: 4,
-            sm: 8,
-            md: 12,
-            lg: 16
-        }
-    },
-    typography: {
-        fonts: {
-            primary: "'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif"
-        },
-        weights: {
-            normal: 400,
-            medium: 500,
-            semibold: 600,
-            bold: 700
-        }
-    },
-    promptPresets: {
-        quality: {
-            icon: "✨",
-            presets: [
-                { value: "masterpiece", label: "Masterpiece" },
-                { value: "best quality", label: "Best Quality" },
-                { value: "ultra detailed", label: "Ultra Detailed" },
-                { value: "high resolution", label: "High Resolution" },
-                { value: "8k uhd", label: "8K UHD" },
-                { value: "professional", label: "Professional" }
-            ]
-        },
-        style: {
-            icon: "🎨", 
-            presets: [
-                { value: "anime", label: "Anime" },
-                { value: "realistic", label: "Realistic" },
-                { value: "watercolor", label: "Watercolor" },
-                { value: "oil painting", label: "Oil Painting" },
-                { value: "digital art", label: "Digital Art" },
-                { value: "concept art", label: "Concept Art" },
-                { value: "3d render", label: "3D Render" },
-                { value: "photorealistic", label: "Photorealistic" }
-            ]
-        },
-        lighting: {
-            icon: "💡",
-            presets: [
-                { value: "dramatic lighting", label: "Dramatic Lighting" },
-                { value: "soft light", label: "Soft Light" },
-                { value: "cinematic", label: "Cinematic" },
-                { value: "volumetric lighting", label: "Volumetric" },
-                { value: "studio lighting", label: "Studio" },
-                { value: "golden hour", label: "Golden Hour" },
-                { value: "neon lighting", label: "Neon" }
-            ]
-        },
-        camera: {
-            icon: "📷",
-            presets: [
-                { value: "close-up shot", label: "Close-up Shot" },
-                { value: "wide angle", label: "Wide Angle" },
-                { value: "bokeh", label: "Bokeh" },
-                { value: "depth of field", label: "Depth of Field" },
-                { value: "portrait shot", label: "Portrait" },
-                { value: "aerial view", label: "Aerial View" },
-                { value: "macro shot", label: "Macro" }
-            ]
-        },
-        mood: {
-            icon: "🎭",
-            presets: [
-                { value: "happy", label: "Happy" },
-                { value: "dark", label: "Dark" },
-                { value: "peaceful", label: "Peaceful" },
-                { value: "mysterious", label: "Mysterious" },
-                { value: "epic", label: "Epic" },
-                { value: "dreamy", label: "Dreamy" },
-                { value: "cyberpunk", label: "Cyberpunk" }
-            ]
-        },
-        environment: {
-            icon: "🌍",
-            presets: [
-                { value: "fantasy landscape", label: "Fantasy" },
-                { value: "sci-fi environment", label: "Sci-Fi" },
-                { value: "post-apocalyptic", label: "Post-Apocalyptic" },
-                { value: "steampunk world", label: "Steampunk" },
-                { value: "underwater scene", label: "Underwater" },
-                { value: "space scene", label: "Space" }
-            ]
-        }
-    },
-    promptTools: {
-        quickActions: [
-            { icon: "📜", action: "history", title: "History" },
-            { icon: "🗑️", action: "clear", title: "Clear" }
-        ]
-    },
-    promptTemplates: {
-        character: {
-            icon: "👤",
-            label: "Character",
-            templates: [
-                { 
-                    name: "Portrait",
-                    prompt: "1girl, portrait, detailed face, looking at viewer, soft lighting, professional photography",
-                    weight: 1.2
-                },
-                { 
-                    name: "Full Body",
-                    prompt: "1girl, full body, standing pose, detailed clothes, professional studio lighting",
-                    weight: 1.0
-                },
-                {
-                    name: "Action",
-                    prompt: "dynamic pose, action shot, detailed movement, dramatic lighting",
-                    weight: 1.1
-                }
-            ]
-        },
-        scene: {
-            icon: "🌅",
-            label: "Scene",
-            templates: [
-                {
-                    name: "Indoor",
-                    prompt: "indoors, detailed room, soft ambient lighting, cozy atmosphere, interior design",
-                    weight: 1.0
-                },
-                {
-                    name: "Outdoor",
-                    prompt: "outdoors, natural lighting, detailed background, scenic view, landscape photography",
-                    weight: 1.1
-                },
-                {
-                    name: "Urban",
-                    prompt: "city street, urban environment, architectural details, street photography",
-                    weight: 1.0
-                }
-            ]
-        },
-        style: {
-            icon: "🎨",
-            label: "Style",
-            templates: [
-                {
-                    name: "Anime",
-                    prompt: "anime style, cel shading, vibrant colors, detailed linework",
-                    weight: 1.0
-                },
-                {
-                    name: "Realistic",
-                    prompt: "realistic, detailed, photorealistic, hyperrealistic, professional photography",
-                    weight: 1.2
-                },
-                {
-                    name: "Fantasy",
-                    prompt: "fantasy art style, magical atmosphere, ethereal lighting, detailed environment",
-                    weight: 1.1
-                },
-                {
-                    name: "Sci-Fi",
-                    prompt: "science fiction, futuristic, high tech, neon lighting, cyberpunk elements",
-                    weight: 1.1
-                }
-            ]
-        }
-    },
-    controls: {
-        button: {
-            size: 20,
-            padding: 4,
-            margin: 4,
-            borderRadius: 4,
-            colors: {
-                bg: "#2D2D3F",
-                bgHover: "#313244",
-                bgDisabled: "#1E1E2E",
-                text: "#CDD6F4",
-                textDisabled: "#45475A",
-                border: "#45475A"
-            }
-        }
-    },
-    effects: {
-        glow: "0 0 10px rgba(139, 92, 246, 0.1)",
-        hover: "0 2px 4px rgba(0, 0, 0, 0.1)",
-        pressed: "0 1px 2px rgba(0, 0, 0, 0.05)"
-    }
+    ...defaultThemeConfig, 
+    promptPresets: defaultPresets, 
+    promptTemplates: defaultTemplates, 
 };
+
+
+injectDialogCSS(THEME);
 
 const fontStyles = document.createElement('style');
 fontStyles.textContent = `
@@ -227,59 +27,30 @@ fontStyles.textContent = `
 document.head.appendChild(fontStyles);
 
 const Utils = {
-    drawRoundedRect(ctx, x, y, w, h, r) {
-        if (!ctx) return;
+    drawRoundedRect(ctx, x, y, w, h, r = 4, options = { fill: true, stroke: false, lineWidth: 1 }) {
         ctx.beginPath();
-        ctx.moveTo(x + r, y);
-        ctx.lineTo(x + w - r, y);
-        ctx.quadraticCurveTo(x + w, y, x + w, y + r);
-        ctx.lineTo(x + w, y + h - r);
-        ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
-        ctx.lineTo(x + r, y + h);
-        ctx.quadraticCurveTo(x, y + h, x, y + h - r);
-        ctx.lineTo(x, y + r);
-        ctx.quadraticCurveTo(x, y, x + r, y);
-        ctx.fill();
-    },
-    truncateText(ctx, text, maxWidth) {
-        const words = text.split(' ');
-        let truncatedText = '';
-        let currentWidth = 0;
-        for (const word of words) {
-            const wordWidth = ctx.measureText(word).width;
-            if (currentWidth + wordWidth > maxWidth) {
-                truncatedText += '...';
-                break;
-            }
-            truncatedText += word + ' ';
-            currentWidth += wordWidth + ctx.measureText(' ').width;
+        ctx.roundRect(x, y, w, h, r);
+        if (options.fill) ctx.fill();
+        if (options.stroke) {
+            ctx.lineWidth = options.lineWidth;
+            ctx.stroke();
         }
-        return truncatedText.trim();
     },
-    textWidthCache: new Map(),
-    
-    measureTextCached(ctx, text) {
-        if (!this.textWidthCache.has(text)) {
-            this.textWidthCache.set(text, ctx.measureText(text).width);
-        }
-        return this.textWidthCache.get(text);
-    },
-
     truncateTextEfficient(ctx, text, maxWidth) {
         if (!text) return '';
-        const cached = this.measureTextCached(ctx, text);
-        if (cached <= maxWidth) return text;
-
+        const width = ctx.measureText(text).width;
+        if (width <= maxWidth) return text;
+        
         const ellipsis = '...';
-        const ellipsisWidth = this.measureTextCached(ctx, ellipsis);
+        const ellipsisWidth = ctx.measureText(ellipsis).width;
         let low = 0;
         let high = text.length;
         let best = 0;
-
+        
         while (low <= high) {
             const mid = (low + high) >>> 1;
             const slice = text.slice(0, mid);
-            const width = this.measureTextCached(ctx, slice) + ellipsisWidth;
+            const width = ctx.measureText(slice).width + ellipsisWidth;
             
             if (width <= maxWidth) {
                 best = mid;
@@ -288,70 +59,41 @@ const Utils = {
                 high = mid - 1;
             }
         }
-
         return text.slice(0, best) + ellipsis;
     }
 };
-
 const UXUtils = {
-    createRipple(ctx, x, y, progress) {
-        const maxRadius = THEME.interactions.ripple.size;
-        const radius = maxRadius * progress;
-        const alpha = 1 - progress;
-        
-        ctx.save();
-        ctx.globalAlpha = alpha;
-        ctx.fillStyle = THEME.interactions.ripple.color;
-        ctx.beginPath();
-        ctx.arc(x, y, radius, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.restore();
-    },
-
-    drawHoverEffect(ctx, x, y, width, height, progress) {
-        ctx.save();
-        ctx.globalAlpha = 0.15;
-        ctx.fillStyle = THEME.colors.bgHover;
-        Utils.drawRoundedRect(ctx, x, y, width, height, 4);
-        ctx.restore();
-    },
-
     drawTooltip(ctx, text, x, y) {
         if (!text) return;
         
         const padding = 8;
         const fontSize = 12;
-        
         ctx.save();
+        
         
         ctx.font = `${fontSize}px ${THEME.typography.fonts.primary}`;
         ctx.textBaseline = "middle";
         ctx.textAlign = "left";
         
+        
         const metrics = ctx.measureText(text);
         const tooltipWidth = metrics.width + (padding * 2);
         const tooltipHeight = fontSize + (padding * 2);
-
-        let tooltipX = x;
+        
+        
+        let tooltipX = Math.max(8, Math.min(x, ctx.canvas.width - tooltipWidth - 8));
         let tooltipY = y - tooltipHeight - 8;
-
-        if (tooltipX + tooltipWidth > ctx.canvas.width - 8) {
-            tooltipX = ctx.canvas.width - tooltipWidth - 8;
-        }
-
-        if (tooltipX < 8) {
-            tooltipX = 8;
-        }
-
         if (tooltipY < 8) {
             tooltipY = y + 24;
         }
-
+        
+        
         ctx.fillStyle = THEME.colors.bgActive;
         ctx.shadowColor = "rgba(0,0,0,0.2)";
         ctx.shadowBlur = 8;
         ctx.shadowOffsetY = 2;
         Utils.drawRoundedRect(ctx, tooltipX, tooltipY, tooltipWidth, tooltipHeight, 4);
+        
         
         ctx.shadowColor = "transparent";
         ctx.fillStyle = THEME.colors.text;
@@ -360,243 +102,191 @@ const UXUtils = {
         ctx.restore();
     }
 };
-
-const STYLES = {
-    row: {
-        height: 32,
-        padding: 8,
-        margin: 1,
-        colors: {
-            bg: {
-                empty: "rgba(40, 44, 52, 0.4)",
-                filled: "rgba(40, 44, 52, 0.6)"
-            },
-            text: {
-                empty: "rgba(255, 255, 255, 0.5)",
-                filled: "rgba(255, 255, 255, 0.9)"
-            }
-        }
-    },
-    weight: {
-        width: 160,
-        line: {
-            width: 40,
-            height: 2,
-            colors: {
-                bg: "rgba(255, 255, 255, 0.1)",
-                fill: "#89b4fa"
-            }
-        }
-    },
-    button: {
-        size: 20,
-        margin: 4,
-        colors: {
-            active: "#2D2D3F",
-            disabled: "#1E1E2E",
-            text: "#CDD6F4",
-            textDisabled: "#45475A"
-        }
-    }
-};
-
 const Renderer = {
     drawPromptRow(ctx, x, y, text, weight, rowWidth, rowHeight, radius) {
         ctx.save();
-        ctx.fillStyle = THEME.colors.surface.base;
+        ctx.fillStyle = THEME.colors.bg;
         ctx.shadowColor = "rgba(0,0,0,0.06)";
         ctx.shadowBlur = 2;
         ctx.shadowOffsetY = 1;
         Utils.drawRoundedRect(ctx, x, y, rowWidth, rowHeight, radius);
         ctx.restore();
-
         ctx.strokeStyle = THEME.colors.border;
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        this.roundedRect(ctx, x, y, rowWidth, rowHeight, radius);
-        ctx.stroke();
-
+        Utils.drawRoundedRect(ctx, x, y, rowWidth, rowHeight, radius, { 
+            fill: false, 
+            stroke: true, 
+            lineWidth: THEME.layout.promptRow.strokeWidth 
+        }); 
         ctx.fillStyle = THEME.colors.text;
-        ctx.font = `400 13px ${THEME.typography.fonts.primary}`;
+        ctx.font = `400 11px ${THEME.typography.fonts.primary}`; 
         const truncatedText = Utils.truncateTextEfficient(ctx, text, rowWidth - 100);
-        // in Renderer.drawPromptRow or similar:
-        const toggleWidth = 30;  // or whatever the checkbox+margin is
-        ctx.fillText(truncatedText, x + toggleWidth + 10, y + rowHeight/2 + 4);
-
-        const weightX = x + rowWidth - 90;
-        const weightY = y + rowHeight/2;
-        
+        const toggleWidth = 15;
+        ctx.fillText(truncatedText, x + toggleWidth + 2, y + rowHeight/2 + 4); 
+        const weightX = x + rowWidth - 55;
+        const weightY = Math.floor(y + (rowHeight / 2));
         ctx.fillStyle = THEME.colors.border;
-        ctx.fillRect(weightX, weightY - 1, 32, 1);
-        
+        ctx.fillRect(weightX, weightY, 32, 1);
         const weightValue = parseFloat(weight) || 1.0;
         ctx.fillStyle = THEME.colors.accent;
-        ctx.fillRect(weightX, weightY - 1, 32 * (weightValue/2), 1);
-
+        ctx.fillRect(weightX, weightY, 32 * (weightValue/2), 1);
         ctx.fillStyle = THEME.colors.textDim;
-        ctx.font = `500 11px ${THEME.typography.fonts.primary}`;
+        ctx.font = `500 8px ${THEME.typography.fonts.primary}`;
         ctx.textAlign = "right";
-        ctx.fillText(weightValue.toFixed(1), weightX + 45, weightY + 4);
+        ctx.fillText(weightValue.toFixed(1), weightX + 50, weightY + 3);
         ctx.textAlign = "left";
     },
 
-    drawControlButtons(ctx, x, y, buttonSize, isAddEnabled, isRemoveEnabled) {
-        const radius = 4;
-        const iconSize = 10;
 
-        ctx.save();
-        ctx.fillStyle = THEME.colors.surface.base;
-        ctx.strokeStyle = THEME.colors.border;
-        ctx.lineWidth = 1;
-        Utils.drawRoundedRect(ctx, x, y, buttonSize * 2 + 1, buttonSize, radius);
-        ctx.stroke();
-
-        ctx.beginPath();
-        ctx.moveTo(x + buttonSize, y);
-        ctx.lineTo(x + buttonSize, y + buttonSize);
-        ctx.stroke();
-
-        ctx.strokeStyle = isRemoveEnabled ? THEME.colors.accent : THEME.colors.textDim;
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        ctx.moveTo(x + (buttonSize - iconSize)/2, y + buttonSize/2);
-        ctx.lineTo(x + (buttonSize + iconSize)/2, y + buttonSize/2);
-        ctx.stroke();
-
-        ctx.strokeStyle = isAddEnabled ? THEME.colors.accent : THEME.colors.textDim;
-        ctx.beginPath();
-        const centerX = x + buttonSize * 1.5;
-        ctx.moveTo(centerX - iconSize/2, y + buttonSize/2);
-        ctx.lineTo(centerX + iconSize/2, y + buttonSize/2);
-        ctx.moveTo(centerX, y + buttonSize/2 - iconSize/2);
-        ctx.lineTo(centerX, y + buttonSize/2 + iconSize/2);
-        ctx.stroke();
-        
-        ctx.restore();
-    },
-
-    roundedRect(ctx, x, y, width, height, radius) {
-        ctx.beginPath();
-        ctx.moveTo(x + radius, y);
-        ctx.lineTo(x + width - radius, y);
-        ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
-        ctx.lineTo(x + width, y + height - radius);
-        ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
-        ctx.lineTo(x + radius, y + height);
-        ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
-        ctx.lineTo(x, y + radius);
-        ctx.quadraticCurveTo(x, y, x + radius, y);
-        ctx.closePath();
-    },
-
-    drawWeight(ctx, weight, x, y) {
-        const { line } = STYLES.weight;
-        
-        ctx.font = `500 12px ${THEME.typography.fonts.primary}`;
-        ctx.textAlign = "right";
-        ctx.fillStyle = STYLES.row.colors.text.filled;
-        ctx.fillText(weight.toFixed(1), x - 4, y);
-
-        const barWidth = 24;
-        const barHeight = 3;
-        const barY = y + 6;
-
-        ctx.fillStyle = THEME.colors.border;
-        ctx.fillRect(x - barWidth - 28, barY, barWidth, barHeight);
-        
-        const fillWidth = barWidth * (weight / 2);
-        ctx.fillStyle = THEME.colors.accent;
-        ctx.fillRect(x - barWidth - 28, barY, fillWidth, barHeight);
-    }
 };
-
 const MultiTextNode = {
     onNodeCreated() {
         if (this.htmlElement) {
             this.htmlElement.classList.add('multitext-node');
         }
-        
         this.setupWidgets();
         
-        const savedPromptCount = localStorage.getItem('multitext_prompt_count');
-        this.activePrompts = savedPromptCount ? parseInt(savedPromptCount) : 2;
+        
+        this.activePrompts = parseInt(localStorage.getItem('multitext_prompt_count')) || 2;
         this.maxPrompts = 20;
-
-            // **NEW: Load Single/Multi mode from storage**
-        const savedMode = localStorage.getItem('multitext_single_prompt');
-        this.isSinglePromptMode = savedMode === "true";  // Convert from string to boolean
-
-        this.applyPromptMode(); // Apply correct mode on startup 
-        this.updateNodeSize();
-        
-        this.hoverStates = new Map();
-        this.ripples = [];
-        
-        this.tooltipState = {
-            visible: false,
-            text: '',
-            x: 0,
-            y: 0
-        };
-
+        this.isSinglePromptMode = localStorage.getItem('multitext_single_prompt') === "true";
+        this.tooltipState = { visible: false, text: '', x: 0, y: 0 };
         this.currentHoverIndex = -1;
-
-        this.visualWidgets = Array(20).fill(null).map((_, i) => ({
-            index: i,
-            isHovered: false
-        }));
         
+        
+        this.applyPromptMode();
+        this.updateNodeSize();
         this.loadFonts();
+        this.loadSavedTemplates();
+        this.loadSavedPresets();
+    },
+    
+    loadSavedTemplates() {
+        try {
+            const savedTemplates = localStorage.getItem('multitext_templates');
+            if (savedTemplates) {
+                const parsedTemplates = JSON.parse(savedTemplates);
+                
+                
+                Object.entries(parsedTemplates).forEach(([category, categoryData]) => {
+                    if (THEME.promptTemplates[category]) {
+                        
+                        THEME.promptTemplates[category].icon = categoryData.icon || THEME.promptTemplates[category].icon;
+                        THEME.promptTemplates[category].label = categoryData.label || THEME.promptTemplates[category].label;
+                        
+                        
+                        if (Array.isArray(categoryData.templates)) {
+                            
+                            const defaultTemplates = THEME.promptTemplates[category].templates || [];
+                            const defaultTemplateNames = defaultTemplates.map(t => t.name);
+                            
+                            
+                            const filteredDefaults = defaultTemplates.filter(template => 
+                                !categoryData.templates.some(t => t.name === template.name)
+                            );
+                            
+                            
+                            const customTemplates = categoryData.templates.map(template => ({
+                                ...template,
+                                isCustom: true
+                            }));
+                            
+                            
+                            THEME.promptTemplates[category].templates = [
+                                ...filteredDefaults,
+                                ...customTemplates
+                            ];
+                        }
+                    } else {
+                        
+                        THEME.promptTemplates[category] = {
+                            ...categoryData,
+                            templates: Array.isArray(categoryData.templates) 
+                                ? categoryData.templates.map(template => ({
+                                    ...template,
+                                    isCustom: true
+                                }))
+                                : []
+                        };
+                    }
+                });
+                
+                console.log('Custom templates loaded successfully');
+            }
+        } catch (error) {
+            console.error('Error loading saved templates:', error);
+        }
+    },
+    
+    loadSavedPresets() {
+        try {
+            const savedPresets = localStorage.getItem('multitext_category_presets');
+            if (savedPresets) {
+                const parsedPresets = JSON.parse(savedPresets);
+                
+                Object.entries(parsedPresets).forEach(([category, categoryData]) => {
+                    if (THEME.promptPresets[category] && Array.isArray(categoryData.presets)) {
+                        
+                        const defaultCategoryPresets = THEME.promptPresets[category].presets || [];
+                        const defaultPresetLabels = defaultCategoryPresets.map(p => p.label);
+
+                        
+                        const customPresets = categoryData.presets.filter(
+                            saved => !defaultPresetLabels.includes(saved.label)
+                        ).map(p => ({ ...p, isCustom: true }));
+
+                        
+                        THEME.promptPresets[category].presets = [
+                            ...defaultCategoryPresets,
+                            ...customPresets
+                        ];
+                    }
+                });
+                console.log('Custom presets loaded successfully');
+            }
+        } catch (error) {
+            console.error('Error loading saved presets:', error);
+        }
+    },
+    
+    _createPromptWidgets(index) {
+        const textWidget = ComfyWidgets["STRING"](this, `text${index}`, ["STRING", { 
+            multiline: true,
+            visible: false
+        }], app);
+        const weightWidget = ComfyWidgets["FLOAT"](this, `weight${index}`, ["FLOAT", {
+            default: 1.0,
+            min: 0.0,
+            max: 2.0,
+            step: 0.1,
+            visible: false
+        }], app);
+        const labelWidget = ComfyWidgets["STRING"](
+            this,
+            `label${index}`,
+            ["STRING", { multiline: false, visible: false }],
+            app
+        );
+        const enabledWidget = ComfyWidgets["BOOLEAN"](
+            this,
+            `enabled${index}`, 
+            ["BOOLEAN", { default: true, visible: false }],
+            app
+        );
+
+        [textWidget, weightWidget, labelWidget, enabledWidget].forEach(widgetData => {
+            if (widgetData?.widget) {
+                widgetData.widget.computeSize = () => [0, -4];
+                widgetData.widget.hidden = true;
+            }
+        });
+
+        
+        
     },
     setupWidgets() {
         for (let i = 1; i <= 20; i++) {
-            const textWidget = ComfyWidgets["STRING"](this, `text${i}`, ["STRING", { 
-                multiline: true,
-                visible: false
-            }], app);
-            const weightWidget = ComfyWidgets["FLOAT"](this, `weight${i}`, ["FLOAT", {
-                default: 1.0,
-                min: 0.0,
-                max: 2.0,
-                step: 0.1,
-                visible: false
-            }], app);
-
-             // NEW: label{i} widget
-            const labelWidget = ComfyWidgets["STRING"](
-                this,
-                `label${i}`,
-                ["STRING", { multiline: false, visible: false }],
-                app
-            );
-
-              // NEW: enabled{i} widget
-            const enabledWidget = ComfyWidgets["BOOLEAN"](
-                this,
-                `enabled${i}`, // name it uniquely
-                ["BOOLEAN", { default: true, visible: false }],
-                app
-            );
-            
-
-            if (textWidget?.widget) {
-                textWidget.widget.computeSize = () => [0, -4];
-                textWidget.widget.hidden = true;
-            }
-            if (weightWidget?.widget) {
-                weightWidget.widget.computeSize = () => [0, -4];
-                weightWidget.widget.hidden = true;
-            }
-            if (labelWidget?.widget) {
-                labelWidget.widget.computeSize = () => [0, -4];
-                labelWidget.widget.hidden = true;
-            }
-            if (enabledWidget?.widget) {
-                enabledWidget.widget.computeSize = () => [0, -4];
-                enabledWidget.widget.hidden = true; // so it doesn't appear by default
-              }
+            this._createPromptWidgets(i);
         }
-
         const separator = ComfyWidgets["STRING"](this, "separator", ["STRING", { 
             default: " ",
             visible: false,
@@ -606,7 +296,6 @@ const MultiTextNode = {
             default: true,
             visible: false 
         }], app);
-
         if (separator?.widget) {
             separator.widget.computeSize = () => [0, -4];
             separator.widget.hidden = true;
@@ -616,23 +305,10 @@ const MultiTextNode = {
             active.widget.computeSize = () => [0, -4];
             active.widget.hidden = true;
         }
-
         this.serialize_widgets = true;
-        this.quickActions = THEME.promptTools.quickActions;
-    },
-
-    setupVisualWidgets() {
-        this.visualWidgets = [];
-        for (let i = 1; i <= 20; i++) {
-            this.visualWidgets.push({
-                index: i,
-                isHovered: false
-            });
-        }
     },
     applyPromptMode() {
         if (this.isSinglePromptMode) {
-            // **Disable all rows except the first**
             for (let i = 1; i < this.activePrompts; i++) {
                 const enabledWidget = this.widgets.find(w => w.name === `enabled${i+1}`);
                 if (enabledWidget) enabledWidget.value = false;
@@ -640,50 +316,28 @@ const MultiTextNode = {
         }
         this.setDirtyCanvas(true);
     },    
-
     onMouseDown(event, pos, ctx) {
         if (event.button === 0) {
             const controls = this.isInsideControlButtons(pos[0], pos[1]);
-            
             if (controls.add) {
                 this.addPrompt();
                 return true;
             } else if (controls.remove) {
                 this.removePrompt();
                 return true;
-            } else if (controls.toggle) { // Handle toggle switch click
+            } else if (controls.toggle) { 
                 this.isSinglePromptMode = !this.isSinglePromptMode;
-                localStorage.setItem('multitext_single_prompt', this.isSinglePromptMode); // **Save state**
-                this.applyPromptMode(); // Apply the new mode
+                localStorage.setItem('multitext_single_prompt', this.isSinglePromptMode); 
+                this.applyPromptMode(); 
                 this.setDirtyCanvas(true);
-                return true;
                 return true;
             } else if (controls.separator) {
                 const separatorMenu = document.createElement('div');
-                separatorMenu.style.cssText = `
-                    position: fixed;
-                    z-index: 10000;
-                    background: ${THEME.colors.bg};
-                    border: 1px solid ${THEME.colors.border};
-                    border-radius: 8px;
-                    box-shadow: 0 4px 16px rgba(0,0,0,0.2);
-                    padding: 8px;
-                    min-width: 180px;
-                    font-family: ${THEME.typography.fonts.primary};
-                `;
-
+                separatorMenu.classList.add('multitext-separator-menu');
                 const title = document.createElement('div');
                 title.textContent = 'Select Separator';
-                title.style.cssText = `
-                    padding: 8px 12px;
-                    color: ${THEME.colors.textDim};
-                    font-size: 13px;
-                    font-weight: 500;
-                    border-bottom: 1px solid ${THEME.colors.border};
-                    margin-bottom: 4px;
-                `;
+                title.classList.add('multitext-separator-title');
                 separatorMenu.appendChild(title);
-
                 const menuItems = [
                     { label: 'Space', value: ' ', icon: '⎵' },
                     { label: 'Comma', value: ',', icon: ',' }, 
@@ -691,113 +345,40 @@ const MultiTextNode = {
                     { label: 'New Line', value: '\\n', icon: '↵' },
                     { label: 'Custom...', value: 'custom', icon: '✏️' }
                 ];
-
                 menuItems.forEach(item => {
                     const menuItem = document.createElement('div');
-                    menuItem.style.cssText = `
-                        padding: 8px 12px;
-                        margin: 2px 0;
-                        cursor: pointer;
-                        border-radius: 6px;
-                        display: flex;
-                        align-items: center;
-                        gap: 8px;
-                        color: ${THEME.colors.text};
-                        font-size: 13px;
-                        transition: all 0.1s ease;
-
-                        &:hover {
-                            background: ${THEME.colors.bgHover};
-                        }
-
-                        &:active {
-                            background: ${THEME.colors.bgActive};
-                            transform: translateY(1px);
-                        }
-                    `;
-
+                    menuItem.classList.add('multitext-separator-item');
                     const icon = document.createElement('span');
                     icon.textContent = item.icon;
-                    icon.style.cssText = `
-                        display: inline-flex;
-                        align-items: center;
-                        justify-content: center;
-                        width: 24px;
-                        height: 24px;
-                        background: ${THEME.colors.bgActive};
-                        border-radius: 4px;
-                        font-size: 14px;
-                        color: ${THEME.colors.accent};
-                    `;
-
+                    icon.classList.add('multitext-separator-icon');
                     const label = document.createElement('span');
                     label.textContent = item.label;
-                    label.style.flex = '1';
-
+                    label.classList.add('multitext-separator-label');
                     menuItem.appendChild(icon);
                     menuItem.appendChild(label);
-
                     if (this.separator?.widget?.value === item.value) {
-                        menuItem.style.background = THEME.colors.bgActive;
-                        icon.style.background = THEME.colors.accent;
-                        icon.style.color = THEME.colors.text;
+                        menuItem.classList.add('selected');
                     }
-
                     menuItem.onclick = () => {
                         if (item.value === 'custom') {
                             const customInput = document.createElement('input');
                             customInput.type = 'text';
-                            customInput.style.cssText = `
-                                width: calc(100% - 24px);
-                                margin: 8px 12px;
-                                padding: 6px 8px;
-                                border: 1px solid ${THEME.colors.border};
-                                border-radius: 4px;
-                                background: ${THEME.colors.bgInput};
-                                color: ${THEME.colors.text};
-                                font-size: 13px;
-                                font-family: ${THEME.typography.fonts.primary};
-                            `;
+                            customInput.classList.add('multitext-separator-custom-input');
                             customInput.placeholder = 'Enter custom separator...';
                             customInput.maxLength = 10;
-
                             while (separatorMenu.firstChild) {
                                 separatorMenu.firstChild.remove();
                             }
-
                             const title = document.createElement('div');
                             title.textContent = 'Custom Separator';
-                            title.style.cssText = `
-                                padding: 8px 12px;
-                                color: ${THEME.colors.textDim};
-                                font-size: 13px;
-                                font-weight: 500;
-                                border-bottom: 1px solid ${THEME.colors.border};
-                                margin-bottom: 4px;
-                            `;
+                            title.classList.add('multitext-separator-title');
                             separatorMenu.appendChild(title);
                             separatorMenu.appendChild(customInput);
-
                             const confirmButton = document.createElement('div');
                             confirmButton.textContent = 'OK';
-                            confirmButton.style.cssText = `
-                                margin: 8px 12px;
-                                padding: 6px 12px;
-                                text-align: center;
-                                background: ${THEME.colors.accent};
-                                color: ${THEME.colors.text};
-                                border-radius: 4px;
-                                cursor: pointer;
-                                font-weight: 500;
-                                
-                                &:hover {
-                                    background: ${THEME.colors.accentHover};
-                                }
-                            `;
+                            confirmButton.classList.add('multitext-separator-confirm-button');
                             separatorMenu.appendChild(confirmButton);
-
                             customInput.focus();
-
                             const applyCustomSeparator = () => {
                                 const customValue = customInput.value;
                                 if (customValue && this.separator?.widget) {
@@ -813,7 +394,6 @@ const MultiTextNode = {
                                 }
                                 separatorMenu.remove();
                             };
-
                             confirmButton.onclick = applyCustomSeparator;
                             customInput.onkeydown = (e) => {
                                 if (e.key === 'Enter') {
@@ -839,11 +419,9 @@ const MultiTextNode = {
                     };
                     separatorMenu.appendChild(menuItem);
                 });
-
                 const rect = ctx.canvas.getBoundingClientRect();
                 separatorMenu.style.left = `${rect.left + pos[0]}px`;
                 separatorMenu.style.top = `${rect.top + pos[1]}px`;
-                
                 const closeMenu = (e) => {
                     if (!separatorMenu.contains(e.target)) {
                         separatorMenu.remove();
@@ -851,9 +429,7 @@ const MultiTextNode = {
                     }
                 };
                 document.addEventListener('mousedown', closeMenu);
-
                 document.body.appendChild(separatorMenu);
-
                 const menuRect = separatorMenu.getBoundingClientRect();
                 if (menuRect.right > window.innerWidth) {
                     separatorMenu.style.left = `${window.innerWidth - menuRect.width - 10}px`;
@@ -861,11 +437,8 @@ const MultiTextNode = {
                 if (menuRect.bottom > window.innerHeight) {
                     separatorMenu.style.top = `${window.innerHeight - menuRect.height - 10}px`;
                 }
-
                 return true;
             }
-            
-                  // check if user clicked a row
                   const index = this.getHoveredWidgetIndex(pos);
                   if (index !== -1 && index < this.activePrompts) {
                     if (this.isInsideToggle(pos, index)) {
@@ -877,21 +450,16 @@ const MultiTextNode = {
             }
             return false;              
           },
-
           isInsideToggle(pos, rowIndex) {
-            const margin = STYLES.row.padding;
-            const rowHeight = STYLES.row.height;
-            const rowMargin = STYLES.row.margin;
-        
+            const margin = THEME.layout.promptRow.padding;
+            const rowHeight = THEME.layout.promptRow.height;
+            const rowMargin = THEME.layout.promptRow.margin;
             const y = margin + rowIndex * (rowHeight + rowMargin);
             const toggleWidth = 30;
             const toggleHeight = 14;
-            const togglePadding = 6;  // Extra padding to reduce accidental blocking
-        
-            // Adjusted toggle positioning
+            const togglePadding = 6;  
             const x1 = margin + togglePadding;
             const y1 = y + rowHeight / 2 - toggleHeight / 2;
-        
             return (
                 pos[0] >= x1 &&
                 pos[0] <= x1 + toggleWidth &&
@@ -899,26 +467,20 @@ const MultiTextNode = {
                 pos[1] <= y1 + toggleHeight
             );
         },
-
         togglePromptRow(index) {
             const enabledWidget = this.widgets.find(w => w.name === `enabled${index+1}`);
-        
             if (this.isSinglePromptMode) {
-                // **Disable all other rows, enable only the clicked row**
                 for (let i = 0; i < this.activePrompts; i++) {
                     const widget = this.widgets.find(w => w.name === `enabled${i+1}`);
-                    if (widget) widget.value = (i === index); // Enable only the clicked one
+                    if (widget) widget.value = (i === index); 
                 }
             } else {
-                // **Multi mode: Allow toggling freely**
                 if (enabledWidget) {
                     enabledWidget.value = !enabledWidget.value;
                 }
             }
-        
             this.setDirtyCanvas(true);
         },        
-
     showEditDialog(index) {
         try {
             const textWidget = this.widgets.find(w => w.name === `text${index}`);
@@ -926,693 +488,843 @@ const MultiTextNode = {
             const labelWidget  = this.widgets.find(w => w.name === `label${index}`);
             if (!textWidget || !weightWidget || !labelWidget) return;
 
-            const dialog = document.createElement('div');
-            dialog.style.cssText = `
-            position: fixed;
-            z-index: 10000;
-            background: ${THEME.colors.bg};
-            padding: ${THEME.sizes.spacing.lg}px;
-            border-radius: ${THEME.sizes.borderRadius * 2}px;
-            border: 1px solid ${THEME.colors.border};
-            box-shadow: 0 8px 32px rgba(0,0,0,0.4);
-            color: ${THEME.colors.text};
-            font-family: ${THEME.typography.fonts.primary};
-            width: 320px;
-            transition: all 0.2s;
-            /* ADDED: a max-height  */
-            max-height: 80vh;       /* 80% of viewport height */s
-        `;
-
-            const content = document.createDocumentFragment();
             
-            const header = document.createElement('div');
-            header.style.cssText = `
-                display: flex;
-                align-items: center;
-                justify-content: space-between;
-                margin: -${THEME.sizes.spacing.lg}px -${THEME.sizes.spacing.lg}px ${THEME.sizes.spacing.md}px;
-                padding: ${THEME.sizes.spacing.md}px;
-                background: ${THEME.colors.bgActive};
-                border-bottom: 1px solid ${THEME.colors.border};
-                cursor: move;
-                user-select: none;
-                border-radius: ${THEME.sizes.borderRadius * 2}px ${THEME.sizes.borderRadius * 2}px 0 0;
-            `;
+            const dialog = DialogUtils.createDialog(THEME, {});
+            dialog.dataset.promptIndex = index.toString();
+            
+            const content = document.createDocumentFragment();
+
+            
+            const saveTemplateButton = DialogUtils.createButton(THEME, {
+                innerHTML: '✚',
+                title: 'Save as Template',
+                className: 'multitext-dialog-button-savetpl',
+                onclick: (event) => {
+                    this.showSaveChoiceDialog(event, dialog.textarea.value, parseFloat(dialog.weightInput.value), dialog);
+                }
+            });
+
+            const saveButton = DialogUtils.createButton(THEME, {
+                innerHTML: '✔️',
+                className: 'multitext-dialog-button-save',
+                onclick: () => {
+                    labelWidget.value = labelInput.value;
+                    textWidget.value = textarea.value;
+                    weightWidget.value = parseFloat(weightInput.value);
+                    this.saveToHistory(textarea.value);
+                    this.updateHistoryDropdown(historyDropdown);
+                    removeDragListeners(); 
+                    dialog.closest('.multitext-dialog')?.remove(); 
+                    this.setDirtyCanvas(true);
+                }
+            });
+
+            const closeBtn = DialogUtils.createButton(THEME, {
+                innerHTML: '×',
+                className: 'multitext-dialog-button-close',
+                onclick: () => dialog.remove()
+            });
+
+            
+            const header = DialogUtils.createHeader(THEME, `Edit Prompt ${index}`, [saveTemplateButton, saveButton, closeBtn]);
 
             let isDragging = false;
-            let currentX;
-            let currentY;
-            let initialX;
-            let initialY;
             let xOffset = 0;
             let yOffset = 0;
-
-            header.addEventListener('mousedown', dragStart);
-            document.addEventListener('mousemove', drag);
-            document.addEventListener('mouseup', dragEnd);
-
+            const removeDragListeners = () => {
+                document.removeEventListener('mousemove', drag);
+                document.removeEventListener('mouseup', dragEnd);
+            };
             function dragStart(e) {
-                if (e.target === header || e.target === title) {
+                if (e.target === header || e.target.classList.contains('multitext-dialog-title')) { 
+                    const popupElement = dialog.closest('.multitext-dialog'); 
+                    if (!popupElement) return; 
                     isDragging = true;
-                    dialog.style.transition = 'none';
+                    popupElement.style.transition = 'none'; 
                     header.style.cursor = 'grabbing';
-
-                    const rect = dialog.getBoundingClientRect();
+                    const rect = popupElement.getBoundingClientRect();
                     xOffset = e.clientX - rect.left;
                     yOffset = e.clientY - rect.top;
+                    e.preventDefault(); 
                 }
             }
-
             function drag(e) {
                 if (isDragging) {
+                    const popupElement = dialog.closest('.multitext-dialog');
+                    if (!popupElement) return;
                     e.preventDefault();
-                    
                     const x = e.clientX - xOffset;
                     const y = e.clientY - yOffset;
-                    
-                    dialog.style.left = `${x}px`;
-                    dialog.style.top = `${y}px`;
-                    dialog.style.transform = 'none';
+                    popupElement.style.left = `${x}px`;
+                    popupElement.style.top = `${y}px`;
+                    popupElement.style.transform = 'none';
                 }
             }
-
             function dragEnd(e) {
-                isDragging = false;
-                header.style.cursor = 'move';
+                if (isDragging) {
+                    const popupElement = dialog.closest('.multitext-dialog');
+                    isDragging = false;
+                    header.style.cursor = 'move';
+                    if (popupElement) {
+                    }
+                }
             }
-            
+            header.addEventListener('mousedown', dragStart);
+            document.addEventListener('mousemove', drag); 
+            document.addEventListener('mouseup', dragEnd);
+            const cleanupDragMain = this._makeDialogDraggable(dialog, header); 
 
-            // Title (Left-aligned)
-            const title = document.createElement('div');
-            title.textContent = `Prompt ${index}`;
-            title.style.cssText = `
-                font-size: ${THEME.sizes.fontSize.title}px;
-                font-weight: ${THEME.typography.weights.semibold};
-                color: ${THEME.colors.text};
-                flex-grow: 1; /* Allows it to take up available space */
-            `;
-
-            // Right-side button container (Save + Close)
-            const buttonContainer = document.createElement('div');
-            buttonContainer.style.cssText = `
-                display: flex;
-                align-items: center;
-                gap: 8px;
-                margin-left: auto; /* Pushes it to the right */
-            `;
-
-            // Save Button
-            const saveButton = document.createElement('button');
-            saveButton.textContent = 'Save';
-            saveButton.style.cssText = `
-                max-width: 100px;
-                padding: 8px 16px;
-                background: ${THEME.colors.accent};
-                border: none;
-                border-radius: 8px;
-                color: white;
-                font-size: 14px;
-                font-weight: 600;
-                cursor: pointer;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                transition: background 0.2s;
-
-                &:hover {
-                    background: ${THEME.colors.accentLight};
-                }
-            `;
-
-            saveButton.onclick = () => {
-                labelWidget.value = labelInput.value;
-                textWidget.value = textarea.value;
-                weightWidget.value = parseFloat(weightInput.value);
-                this.saveToHistory(textarea.value);
-                dialog.remove();
-                this.setDirtyCanvas(true);
-            };
-
-            // Close Button (X)
-            const closeBtn = document.createElement('button');
-            closeBtn.innerHTML = '×';
-            closeBtn.style.cssText = `
-                background: none;
-                border: none;
-                color: ${THEME.colors.textDim};
-                font-size: 24px;
-                cursor: pointer;
-                padding: 0;
-                width: 32px;
-                height: 32px;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                border-radius: 8px;
-                transition: color 0.2s;
-
-                &:hover {
-                    color: ${THEME.colors.text};
-                }
-            `;
-
-            closeBtn.onclick = () => dialog.remove();
-
-            // Append Save + Close inside buttonContainer
-            buttonContainer.appendChild(saveButton);
-            buttonContainer.appendChild(closeBtn);
-
-            // Append elements to header
-            header.appendChild(title);
-            header.appendChild(buttonContainer);
-
-            // Append header to the content
             content.appendChild(header);
-
-            // **NEW: Scrollable Content Wrapper**
             const contentWrapper = document.createElement('div');
-            contentWrapper.style.cssText = `
-                flex-grow: 1;
-                overflow-y: auto;
-                padding: 0px;
-                margin: -${THEME.sizes.spacing.sm}px;
-                scrollbar-width: thin;
-                scrollbar-color: ${THEME.colors.border} transparent;
-                max-height: calc(80vh - 60px); /* Adjust based on header height */
-            `;
-            content.appendChild(contentWrapper);      
-            
-            const labelGroup = document.createElement('div');
-            labelGroup.style.cssText = `
-              display: flex;
-              flex-direction: column;
-              margin-bottom: 8px;
-            `;
-        
-            const labelLabel = document.createElement('label');
-            labelLabel.textContent = 'Prompt Name:';
-            labelLabel.style.cssText = `
-              color: ${THEME.colors.textDim};
-              font-size: ${THEME.sizes.fontSize.normal}px;
-              margin-bottom: 4px;
-            `;
-        
-            const labelInput = document.createElement('input');
-            labelInput.type = 'text';
-            labelInput.value = labelWidget.value || '';  // existing label or empty
-            labelInput.style.cssText = `
-              width: 100%;
-              background: ${THEME.colors.surface.base};
-              border: 1px solid ${THEME.colors.border};
-              border-radius: 4px;
-              padding: 6px;
-              color: ${THEME.colors.text};
-              font-family: ${THEME.typography.fonts.primary};
-            `;
-        
-            labelGroup.appendChild(labelLabel);
-            labelGroup.appendChild(labelInput);
-            contentWrapper.appendChild(labelGroup);
+            contentWrapper.classList.add('multitext-dialog-content');
+            content.appendChild(contentWrapper);
 
-            const textarea = document.createElement('textarea');
-            textarea.value = textWidget.value || '';
-            textarea.style.cssText = `
-                width: 100%;
-                height: 120px;
-                background: ${THEME.colors.surface.base};
-                border: 1px solid ${THEME.colors.border};
-                border-radius: ${THEME.sizes.borderRadius}px;
-                padding: ${THEME.sizes.spacing.md}px;
-                color: ${THEME.colors.text};
-                font-size: ${THEME.sizes.fontSize.normal}px;
-                font-family: ${THEME.typography.fonts.primary};
-                line-height: 1.5;
-                resize: vertical;
-                margin-bottom: ${THEME.sizes.spacing.md}px;
-            `;
+            
+            const labelInput = DialogUtils.createInput(THEME, {
+                value: labelWidget.value || '',
+                placeholder: 'Optional name...',
+            });
+            dialog.labelInput = labelInput; 
+            labelInput.style.marginBottom = '12px';
+            contentWrapper.appendChild(labelInput);
+
+            
+            const textarea = DialogUtils.createTextarea(THEME, {
+                value: textWidget.value || '',
+                placeholder: 'Enter prompt text here...',
+            });
+            dialog.textarea = textarea;
             contentWrapper.appendChild(textarea);
 
-            //Append pre-set container after text area
-            const presetContainer = document.createElement('div');
-            presetContainer.style.cssText = `
-                display: flex;
-                gap: 8px;
-                margin-bottom: 8px;
-                overflow-x: auto;
-                white-space: nowrap;
-                padding-bottom: 4px;
-                scrollbar-width: thin;
-                scrollbar-color: ${THEME.colors.border} transparent;
-                &::-webkit-scrollbar {
-                    height: 6px;
-                }
-                &::-webkit-scrollbar-track {
-                    background: transparent;
-                }
-                &::-webkit-scrollbar-thumb {
-                    background-color: ${THEME.colors.border};
-                    border-radius: 3px;
-                }
-            `;
             
-            Object.entries(THEME.promptPresets).forEach(([category, categoryData]) => {
-                if (!categoryData || !categoryData.presets) return;
-
-                const select = document.createElement('select');
-                select.style.cssText = `
-                    background: ${THEME.colors.bgActive};
-                    border: 1px solid ${THEME.colors.border};
-                    color: ${THEME.colors.text};
-                    padding: 4px 8px;
-                    border-radius: 4px;
-                    font-size: 12px;
-                    min-width: 100px;
-                    cursor: pointer;
-                    outline: none;
-                    flex-shrink: 0;
-                    &:hover {
-                        border-color: ${THEME.colors.accent};
-                    }
-                `;
+            const toolbar = document.createElement('div');
+            toolbar.classList.add('multitext-dialog-toolbar');
+            const historyDropdown = document.createElement('div');
+            historyDropdown.className = 'history-dropdown'; 
+            historyDropdown.classList.add('multitext-dialog-history-dropdown'); 
+            historyDropdown.style.display = 'none';
+            THEME.promptTools.quickActions.forEach(action => {
                 
-                const defaultOption = document.createElement('option');
-                defaultOption.text = `${categoryData.icon || ''} ${category.charAt(0).toUpperCase() + category.slice(1)}`;
-                defaultOption.value = '';
-                select.appendChild(defaultOption);
-                
-                categoryData.presets.forEach(preset => {
-                    const option = document.createElement('option');
-                    option.text = preset.label;
-                    option.value = preset.value;
-                    select.appendChild(option);
-                });
-                
-                select.addEventListener('change', () => {
-                    if (select.value) {
-                        const currentText = textarea.value.trim();
-                        textarea.value = currentText 
-                            ? `${currentText}, ${select.value}` 
-                            : select.value;
-                        
-                        textarea.dispatchEvent(new Event('input'));
-                        setTimeout(() => {
-                            select.value = '';
-                        }, 100);
+                const btn = DialogUtils.createButton(THEME, {
+                    innerHTML: action.icon,
+                    title: action.title,
+                    className: 'multitext-dialog-toolbar-button',
+                    onclick: () => {
+                        if (action.action === 'history') {
+                            const newDisplay = historyDropdown.style.display === 'none' ? 'block' : 'none';
+                            historyDropdown.style.display = newDisplay;
+                            if (newDisplay === 'block') {
+                                this.updateHistoryDropdown(historyDropdown);
+                            }
+                        } else {
+                            this.handleQuickAction(action.action, textarea);
+                        }
                     }
                 });
-                
-                presetContainer.appendChild(select);
+                toolbar.appendChild(btn);
             });
+            toolbar.appendChild(historyDropdown);
             
-            contentWrapper.appendChild(presetContainer);
-
             const weightGroup = document.createElement('div');
-            weightGroup.style.cssText = `
-                display: flex;
-                align-items: center;
-                gap: 8px;
-                margin-top: 4px;
-            `;
-
+            weightGroup.classList.add('multitext-dialog-weight-group');
+            const weightContainer = document.createElement('div');
+            weightContainer.classList.add('multitext-dialog-weight-container');
             const weightLabel = document.createElement('label');
-            weightLabel.textContent = 'Weight';
-            weightLabel.style.cssText = `
-                color: ${THEME.colors.textDim};
-                font-size: ${THEME.sizes.fontSize.normal}px;
-            `;
-
+            weightLabel.textContent = 'Weight:';
+            weightLabel.classList.add('multitext-dialog-weight-label');
             const weightInput = document.createElement('input');
             weightInput.type = 'number';
             weightInput.value = weightWidget.value;
             weightInput.step = '0.1';
             weightInput.min = '0';
             weightInput.max = '2';
-            weightInput.style.cssText = `
-                width: 60px;
-                background: ${THEME.colors.surface.base};
-                border: 1px solid ${THEME.colors.border};
-                border-radius: 4px;
-                padding: 4px;
-                color: ${THEME.colors.text};
-                text-align: center;
-                font-family: ${THEME.typography.fonts.primary};
-            `;
-
-            weightGroup.appendChild(weightLabel);
-            weightGroup.appendChild(weightInput);
+            weightInput.classList.add('multitext-dialog-weight-input');
+            dialog.weightInput = weightInput;
+            weightContainer.appendChild(weightLabel);
+            weightContainer.appendChild(weightInput);
+            weightGroup.appendChild(weightContainer);
+            weightGroup.appendChild(toolbar); 
             contentWrapper.appendChild(weightGroup);
 
-            const toolbar = document.createElement('div');
-            toolbar.style.cssText = `
-                display: flex;
-                gap: 4px;
-                margin-bottom: 12px;
-                position: relative;
-            `;
-
-            const historyDropdown = document.createElement('div');
-            historyDropdown.className = 'history-dropdown';
-            historyDropdown.style.cssText = `
-                display: none;
-                position: absolute;
-                top: 32px;
-                left: 0;
-                width: 100%;
-                max-height: 200px;
-                overflow-y: auto;
-                background: ${THEME.colors.surface.base};
-                border: 1px solid ${THEME.colors.border};
-                border-radius: 4px;
-                margin-top: 4px;
-                z-index: 1000;
-                box-shadow: ${THEME.effects.hover};
-            `;
-
-            THEME.promptTools.quickActions.forEach(action => {
-                const btn = document.createElement('button');
-                btn.innerHTML = action.icon;
-                btn.title = action.title;
-                btn.style.cssText = `
-                    width: 28px;
-                    height: 28px;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    background: ${THEME.colors.surface.base};
-                    border: 1px solid ${THEME.colors.border};
-                    border-radius: 4px;
-                    color: ${THEME.colors.text};
-                    cursor: pointer;
-                    transition: all 0.2s;
-                    padding: 0;
-                    font-size: 14px;
-
-                    &:hover {
-                        background: ${THEME.colors.surface.hover};
-                        border-color: ${THEME.colors.accent};
-                    }
-
-                    &:active {
-                        transform: translateY(1px);
-                    }
-                `;
-
-                btn.onclick = () => {
-                    if (action.action === 'history') {
-                        historyDropdown.style.display = 
-                            historyDropdown.style.display === 'none' ? 'block' : 'none';
-                    } else {
-                        this.handleQuickAction(action.action, textarea);
+            
+            const presetContainer = document.createElement('div');
+            presetContainer.classList.add('multitext-dialog-preset-container');
+            presetContainer.style.display = 'flex';
+            presetContainer.style.flexDirection = 'column';
+            presetContainer.style.gap = '8px';
+            presetContainer.style.background = '#1b1b1b';
+            presetContainer.style.borderRadius = '8px';
+            presetContainer.style.padding = '8px';
+            presetContainer.style.margin = '4px 0';
+            const categoryContainer = document.createElement('div');
+            categoryContainer.style.display = 'flex';
+            categoryContainer.style.flexWrap = 'wrap';
+            categoryContainer.style.gap = '4px';
+            categoryContainer.style.alignItems = 'center';
+            const presetsContainer = document.createElement('div');
+            presetsContainer.style.display = 'none';
+            presetsContainer.style.flexWrap = 'wrap';
+            presetsContainer.style.gap = '4px';
+            presetsContainer.style.marginTop = '6px';
+            presetsContainer.style.paddingTop = '6px';
+            presetsContainer.style.borderTop = '1px solid #2a2a2a';
+            let activeCategory = null;
+            Object.entries(THEME.promptPresets).forEach(([category, categoryData]) => {
+                if (!categoryData || !categoryData.presets) return;
+                const categoryTag = document.createElement('button');
+                categoryTag.classList.add('multitext-dialog-category-tag');
+                categoryTag.style.background = '#232323';
+                categoryTag.style.border = '1px solid #2c2c2c';
+                categoryTag.style.borderRadius = '4px';
+                categoryTag.style.color = '#999';
+                categoryTag.style.padding = '4px 8px';
+                categoryTag.style.cursor = 'pointer';
+                categoryTag.style.fontSize = '12px';
+                categoryTag.style.transition = 'all 0.15s ease';
+                categoryTag.style.display = 'flex';
+                categoryTag.style.alignItems = 'center';
+                categoryTag.style.gap = '4px';
+                categoryTag.style.minWidth = 'fit-content';
+                categoryTag.style.whiteSpace = 'nowrap';
+                categoryTag.title = category.charAt(0).toUpperCase() + category.slice(1);
+                const icon = categoryData.icon || '';
+                categoryTag.innerHTML = `<span style="opacity: 0.9">${icon}</span>`;
+                categoryTag.onmouseover = () => {
+                    categoryTag.style.background = '#2a2a2a';
+                    categoryTag.style.borderColor = '#363636';
+                    categoryTag.style.color = '#ccc';
+                };
+                categoryTag.onmouseout = () => {
+                    if (category !== activeCategory) {
+                        categoryTag.style.background = '#232323';
+                        categoryTag.style.borderColor = '#2c2c2c';
+                        categoryTag.style.color = '#999';
                     }
                 };
+                categoryTag.onclick = () => {
+                    if (activeCategory === category) {
+                        presetsContainer.style.display = 'none';
+                        categoryTag.style.background = '#232323';
+                        categoryTag.style.borderColor = '#2c2c2c';
+                        categoryTag.style.color = '#999';
+                        activeCategory = null;
+                    } else {
+                        presetsContainer.innerHTML = '';
+                        presetsContainer.style.display = 'flex';
+                        categoryContainer.querySelectorAll('button').forEach(btn => {
+                            btn.style.background = '#232323';
+                            btn.style.borderColor = '#2c2c2c';
+                            btn.style.color = '#999';
+                        });
+                        categoryTag.style.background = '#2a2a2a';
+                        categoryTag.style.borderColor = '#363636';
+                        categoryTag.style.color = '#ccc';
+                        activeCategory = category;
+                        categoryData.presets.forEach(preset => {
+                            const presetBtn = document.createElement('button');
+                            presetBtn.classList.add('multitext-dialog-preset-tag');
+                            presetBtn.style.background = '#1e1e1e';
+                            presetBtn.style.border = '1px solid #2c2c2c';
+                            presetBtn.style.borderRadius = '4px';
+                            presetBtn.style.color = '#999';
+                            presetBtn.style.padding = '3px 8px';
+                            presetBtn.style.cursor = 'pointer';
+                            presetBtn.style.fontSize = '12px';
+                            presetBtn.style.transition = 'all 0.15s ease';
+                            presetBtn.style.display = 'flex';
+                            presetBtn.style.alignItems = 'center';
+                            presetBtn.style.gap = '4px';
+                            presetBtn.innerHTML = preset.label;
+                            presetBtn.oncontextmenu = (e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                const menu = document.createElement('div');
+                                menu.style.position = 'fixed';
+                                menu.style.left = e.clientX + 'px';
+                                menu.style.top = e.clientY + 'px';
+                                menu.style.background = '#1b1b1b';
+                                menu.style.border = '1px solid #2c2c2c';
+                                menu.style.borderRadius = '4px';
+                                menu.style.padding = '4px';
+                                menu.style.zIndex = '10000';
+                                const editBtn = document.createElement('button');
+                                editBtn.style.display = 'block';
+                                editBtn.style.width = '100%';
+                                editBtn.style.padding = '4px 8px';
+                                editBtn.style.background = 'none';
+                                editBtn.style.border = 'none';
+                                editBtn.style.color = '#999';
+                                editBtn.style.cursor = 'pointer';
+                                editBtn.style.textAlign = 'left';
+                                editBtn.innerHTML = '✏️ Edit';
+                                editBtn.onmouseover = () => editBtn.style.background = '#252525';
+                                editBtn.onmouseout = () => editBtn.style.background = 'none';
+                                editBtn.onclick = () => {
+                                    this._showEditPresetDialog(preset);
+                                    menu.remove();
+                                };
+                                menu.appendChild(editBtn);
+                                const deleteBtn = document.createElement('button');
+                                deleteBtn.style.display = 'block'; 
+                                deleteBtn.style.width = '100%';
+                                deleteBtn.style.padding = '4px 8px';
+                                deleteBtn.style.background = 'none';
+                                deleteBtn.style.border = 'none';
+                                deleteBtn.style.color = '#999';
+                                deleteBtn.style.cursor = 'pointer';
+                                deleteBtn.style.textAlign = 'left';
+                                deleteBtn.innerHTML = '🗑️ Delete';
+                                deleteBtn.onmouseover = () => deleteBtn.style.background = '#252525';
+                                deleteBtn.onmouseout = () => deleteBtn.style.background = 'none';
+                                deleteBtn.onclick = () => {
+                                    this._showDeletePresetDialog(preset);
+                                    menu.remove();
+                                };
+                                menu.appendChild(deleteBtn);
+                                document.body.appendChild(menu);
+                                const closeMenu = (e) => {
+                                    if (!menu.contains(e.target)) {
+                                        menu.remove();
+                                        document.removeEventListener('click', closeMenu);
+                                    }
+                                };
+                                document.addEventListener('click', closeMenu);
+                            };
+                            presetBtn.onmouseover = () => {
+                                presetBtn.style.background = '#252525';
+                                presetBtn.style.borderColor = '#363636';
+                                presetBtn.style.color = '#ccc';
+                            };
+                            presetBtn.onmouseout = () => {
+                                presetBtn.style.background = '#1e1e1e';
+                                presetBtn.style.borderColor = '#2c2c2c';
+                                presetBtn.style.color = '#999';
+                            };
+                            presetBtn.onclick = (e) => {
+                                e.stopPropagation();
+                                if (!preset.value) return; 
+                                
+                                const textarea = dialog.textarea;
+                                if (textarea) {
+                                    const currentText = textarea.value;
+                                    const newText = preset.value;
+                                    textarea.value = currentText ? `${currentText}, ${newText}` : newText;
+                                    textarea.dispatchEvent(new Event('input')); 
+                                    
+                                    
+                                    const textWidget = this.widgets.find(w => w.name === `text${dialog.dataset.promptIndex}`);
+                                    if (textWidget) {
+                                        textWidget.value = textarea.value;
+                                    }
+                                    
 
-                weightGroup.appendChild(btn);
+                                    
+                                    presetBtn.style.background = '#2d2d2d';
+                                    setTimeout(() => {
+                                        presetBtn.style.background = '#1e1e1e';
+                                    }, 150);
+                                }
+                            };
+                            presetsContainer.appendChild(presetBtn);
+                        });
+                    }
+                };
+                categoryContainer.appendChild(categoryTag);
             });
-
-            const history = this.loadPromptHistory();
-            if (history.length > 0) {
-                history.forEach(item => {
-                    const historyItem = document.createElement('div');
-                    historyItem.style.cssText = `
-                        padding: 8px 12px;
-                        cursor: pointer;
-                        border-bottom: 1px solid ${THEME.colors.border};
-                        display: flex;
-                        align-items: center;
-                        justify-content: space-between;
-                        gap: 8px;
-                        &:hover {
-                            background: ${THEME.colors.surface.hover};
-                        }
-                        &:last-child {
-                            border-bottom: none;
-                        }
-                    `;
-
-                    const textContent = document.createElement('div');
-                    textContent.style.cssText = `
-                        flex: 1;
-                        overflow: hidden;
-                        text-overflow: ellipsis;
-                        white-space: nowrap;
-                    `;
-                    textContent.textContent = item.text;
-
-                    const deleteBtn = document.createElement('button');
-                    deleteBtn.innerHTML = '🗑️';
-                    deleteBtn.title = 'Delete from history';
-                    deleteBtn.style.cssText = `
-                        background: none;
-                        border: none;
-                        color: ${THEME.colors.textDim};
-                        font-size: 12px;
-                        padding: 4px;
-                        cursor: pointer;
-                        opacity: 0.6;
-                        transition: all 0.2s;
-                        display: none;
-
-                        &:hover {
-                            opacity: 1;
-                            color: ${THEME.colors.error || '#ff4444'};
-                        }
-                    `;
-
-                    historyItem.onmouseenter = () => {
-                        deleteBtn.style.display = 'block';
-                    };
-                    historyItem.onmouseleave = () => {
-                        deleteBtn.style.display = 'none';
-                    };
-
-                    deleteBtn.onclick = (e) => {
-                        e.stopPropagation();
-                        const history = this.loadPromptHistory();
-                        const updatedHistory = history.filter(h => h.text !== item.text);
-                        localStorage.setItem('multitext_history', JSON.stringify(updatedHistory));
-                        historyItem.remove();
-
-                        if (updatedHistory.length === 0) {
-                            const emptyMessage = document.createElement('div');
-                            emptyMessage.style.cssText = `
-                                padding: 8px 12px;
-                                color: ${THEME.colors.textDim};
-                                text-align: center;
-                            `;
-                            emptyMessage.textContent = 'History is empty';
-                            historyDropdown.appendChild(emptyMessage);
-                        }
-                    };
-
-                    textContent.onclick = () => {
-                        this._lastValues.push(textarea.value);
-                        textarea.value = item.text;
-                        textarea.dispatchEvent(new Event('input'));
-                        historyDropdown.style.display = 'none';
-                    };
-
-                    historyItem.appendChild(textContent);
-                    historyItem.appendChild(deleteBtn);
-                    historyDropdown.appendChild(historyItem);
+            const editButton = document.createElement('button');
+            editButton.classList.add('multitext-dialog-category-tag');
+            editButton.style.background = '#232323';
+            editButton.style.border = '1px solid #2c2c2c';
+            editButton.style.borderRadius = '4px';
+            editButton.style.color = '#999';
+            editButton.style.padding = '4px 8px';
+            editButton.style.cursor = 'pointer';
+            editButton.style.fontSize = '12px';
+            editButton.style.transition = 'all 0.15s ease';
+            editButton.style.display = 'flex';
+            editButton.style.alignItems = 'center';
+            editButton.style.marginLeft = 'auto';
+            editButton.title = 'Manage Presets';
+            editButton.innerHTML = '⚙️';
+            editButton.onmouseover = () => {
+                editButton.style.background = '#2a2a2a';
+                editButton.style.borderColor = '#363636';
+                editButton.style.color = '#ccc';
+            };
+            editButton.onmouseout = () => {
+                editButton.style.background = '#232323';
+                editButton.style.borderColor = '#2c2c2c';
+                editButton.style.color = '#999';
+            };
+            editButton.onclick = () => {
+                const managementDialog = DialogUtils.createDialog(THEME, {
+                    width: '320px',
+                    maxHeight: '60vh',
+                    
+                    className: 'multitext-manage-presets-dialog' 
                 });
-            } else {
-                const emptyMessage = document.createElement('div');
-                emptyMessage.style.cssText = `
-                    padding: 8px 12px;
-                    color: ${THEME.colors.textDim};
-                    text-align: center;
-                `;
-                emptyMessage.textContent = 'History is empty';
-                historyDropdown.appendChild(emptyMessage);
-            }
 
-            weightGroup.appendChild(historyDropdown);
-            contentWrapper.appendChild(toolbar);
+                const closeManageDialog = () => {
+                    managementDialog.remove();
+                    document.removeEventListener('mousedown', closeDialogOnClickOutside);
+                };
+                const closeDialogButton = DialogUtils.createButton(THEME, {
+                    innerHTML: '✕',
+                    className: 'multitext-dialog-button-close', 
+                    onclick: closeManageDialog
+                });
+                const header = DialogUtils.createHeader(THEME, 'Manage Presets', [closeDialogButton]);
+                managementDialog.appendChild(header);
 
+                const contentContainer = document.createElement('div');
+                contentContainer.style.overflowY = 'auto';
+                contentContainer.style.overflowX = 'hidden';
+                contentContainer.style.paddingRight = '8px';
+                contentContainer.style.marginRight = '-8px';
+                contentContainer.style.display = 'flex';
+                contentContainer.style.flexDirection = 'column';
+                contentContainer.style.gap = '8px';
+                
+                contentContainer.classList.add('multitext-dialog-content'); 
+
+                Object.entries(THEME.promptPresets).forEach(([category, categoryData]) => {
+                    if (!categoryData || !categoryData.presets) return;
+                    const categorySection = document.createElement('div');
+                    categorySection.style.display = 'flex';
+                    categorySection.style.flexDirection = 'column';
+                    categorySection.style.gap = '4px';
+                    categorySection.classList.add('multitext-manage-presets-category-section');
+
+                    const categoryHeader = document.createElement('div');
+                    categoryHeader.style.display = 'flex';
+                    categoryHeader.style.alignItems = 'center';
+                    categoryHeader.style.gap = '6px';
+                    categoryHeader.classList.add('multitext-manage-presets-category-header');
+
+                    const categoryTitle = document.createElement('h4');
+                    categoryTitle.textContent = category.charAt(0).toUpperCase() + category.slice(1);
+                    categoryTitle.style.margin = '0';
+                    categoryTitle.style.fontSize = '13px';
+                    categoryTitle.style.fontWeight = 'normal';
+                    categoryTitle.style.color = '#ccc';
+                    categoryTitle.style.flex = '1';
+                    categoryTitle.classList.add('multitext-manage-presets-category-title');
+
+                    const addPresetBtn = DialogUtils.createButton(THEME, {
+                        innerHTML: '+',
+                        title: 'Add new preset',
+                        
+                        className: 'multitext-manage-presets-add-button',
+                        onclick: (e) => {
+                            e.stopPropagation();
+                            this.showSavePresetDialog('', 1.0, managementDialog); 
+                        }
+                    });
+                    
+                    addPresetBtn.style.padding = '2px 6px'; 
+                    addPresetBtn.style.fontSize = '12px';
+                    addPresetBtn.style.minWidth = '20px';
+                    
+
+                    const presetsList = document.createElement('div');
+                    presetsList.style.display = 'flex';
+                    presetsList.style.flexDirection = 'column';
+                    presetsList.style.gap = '2px';
+                    presetsList.classList.add('multitext-manage-presets-list');
+
+                    categoryData.presets.forEach(preset => {
+                        const presetItem = document.createElement('div');
+                        presetItem.style.display = 'flex';
+                        presetItem.style.alignItems = 'center';
+                        presetItem.style.gap = '6px';
+                        presetItem.style.padding = '4px 6px';
+                        presetItem.style.background = '#1e1e1e';
+                        presetItem.style.borderRadius = '4px';
+                        presetItem.style.border = '1px solid #2c2c2c';
+                        presetItem.style.fontSize = '12px';
+                        presetItem.classList.add('multitext-manage-presets-item');
+
+                        const presetLabel = document.createElement('span');
+                        presetLabel.textContent = preset.label;
+                        presetLabel.style.flex = '1';
+                        presetLabel.style.overflow = 'hidden';
+                        presetLabel.style.textOverflow = 'ellipsis';
+                        presetLabel.style.whiteSpace = 'nowrap';
+                        presetLabel.style.color = '#999';
+                        presetLabel.classList.add('multitext-manage-presets-item-label');
+
+                        const buttonsContainer = document.createElement('div');
+                        buttonsContainer.style.display = 'flex';
+                        buttonsContainer.style.gap = '2px';
+                        buttonsContainer.style.alignItems = 'center';
+                        buttonsContainer.classList.add('multitext-manage-presets-item-buttons');
+
+                        const editPresetBtn = DialogUtils.createButton(THEME, {
+                            innerHTML: '✏️',
+                            title: 'Edit preset',
+                            className: 'multitext-manage-presets-action-button', 
+                            onclick: (e) => {
+                                e.stopPropagation();
+                                
+                                const showEditPresetDialog = (preset, presetLabelElement, categorySectionElement, categoryDataObject, presetsListElement) => {
+                                     const editDialog = DialogUtils.createDialog(THEME, {
+                                        className: 'multitext-save-preset-dialog',
+                                        
+                                    });
+                                    editDialog.style.zIndex = '10002'; 
+
+                                    
+                                    let isDraggingEdit = false;
+                                    let xOffsetEdit = 0;
+                                    let yOffsetEdit = 0;
+
+                                    const removeDragListenersEdit = () => {
+                                        document.removeEventListener('mousemove', dragEdit);
+                                        document.removeEventListener('mouseup', dragEndEdit);
+                                    };
+
+                                    function dragStartEdit(e) {
+                                        
+                                        if (e.target === editHeader || editHeader.contains(e.target)) { 
+                                            const popupElement = editDialog; 
+                                            if (!popupElement) return; 
+                                            isDraggingEdit = true;
+                                            popupElement.style.transition = 'none'; 
+                                            editHeader.style.cursor = 'grabbing';
+                                            const rect = popupElement.getBoundingClientRect();
+                                            xOffsetEdit = e.clientX - rect.left;
+                                            yOffsetEdit = e.clientY - rect.top;
+                                            e.preventDefault(); 
+                                            
+                                            document.addEventListener('mousemove', dragEdit); 
+                                            document.addEventListener('mouseup', dragEndEdit);
+                                        }
+                                    }
+
+                                    function dragEdit(e) {
+                                        if (isDraggingEdit) {
+                                            const popupElement = editDialog;
+                                            if (!popupElement) return;
+                                            e.preventDefault();
+                                            const x = e.clientX - xOffsetEdit;
+                                            const y = e.clientY - yOffsetEdit;
+                                            popupElement.style.left = `${x}px`;
+                                            popupElement.style.top = `${y}px`;
+                                            popupElement.style.transform = 'none'; 
+                                        }
+                                    }
+
+                                    function dragEndEdit(e) {
+                                        if (isDraggingEdit) {
+                                            isDraggingEdit = false;
+                                            editHeader.style.cursor = 'move';
+                                            removeDragListenersEdit(); 
+                                        }
+                                    }
+                                    
+
+                                    const editHeader = DialogUtils.createHeader(THEME, 'Edit Preset', [
+                                        DialogUtils.createButton(THEME, {
+                                            innerHTML: '✕',
+                                            className: 'multitext-dialog-button-close',
+                                            onclick: () => editDialog.remove()
+                                        })
+                                    ]);
+                                    editDialog.appendChild(editHeader); 
+                                    editHeader.addEventListener('mousedown', dragStartEdit); 
+                                    const cleanupDragEdit = this._makeDialogDraggable(editDialog, editHeader); 
+
+                                    const nameInput = DialogUtils.createInput(THEME, {
+                                        value: preset.label,
+                                        placeholder: 'Preset name',
+                                        className: 'multitext-save-preset-input' 
+                                    });
+                                    editDialog.appendChild(nameInput);
+                                     const valueInput = DialogUtils.createTextarea(THEME, {
+                                        value: preset.value,
+                                        placeholder: 'Preset value',
+                                        className: 'multitext-dialog-textarea' 
+                                    });
+                                    editDialog.appendChild(valueInput);
+                                     const buttons = document.createElement('div');
+                                    buttons.classList.add('multitext-save-preset-buttons');
+                                    const cancelBtn = DialogUtils.createButton(THEME, {
+                                        innerHTML: 'Cancel',
+                                        className: 'multitext-save-preset-button multitext-save-preset-button-cancel',
+                                        onclick: (e) => {
+                                            e.stopPropagation();
+                                            editDialog.remove();
+                                        }
+                                    });
+                                    const saveBtn = DialogUtils.createButton(THEME, {
+                                        innerHTML: 'Save',
+                                        className: 'multitext-save-preset-button multitext-save-preset-button-save',
+                                        onclick: (e) => {
+                                            e.stopPropagation();
+                                            const newName = nameInput.value.trim();
+                                            const newValue = valueInput.value.trim();
+                                            if (newName && newValue) {
+                                                preset.label = newName;
+                                                preset.value = newValue;
+                                                presetLabelElement.textContent = newName;
+                                                this.saveToHistory(newValue); 
+                                                localStorage.setItem('multitext_category_presets', JSON.stringify(THEME.promptPresets));
+                                                editDialog.remove();
+                                            }
+                                        }
+                                    });
+                                    buttons.appendChild(cancelBtn);
+                                    buttons.appendChild(saveBtn);
+                                    editDialog.appendChild(buttons);
+                                     editDialog.addEventListener('mousedown', (e) => {
+                                        e.stopPropagation(); 
+                                    });
+                                     document.body.appendChild(editDialog);
+                                    nameInput.focus();
+                                    nameInput.select();
+
+                                    
+                                    requestAnimationFrame(() => { 
+                                        const container = document.querySelector('.graph-canvas-container') || document.body;
+                                        const containerRect = container.getBoundingClientRect();
+                                        const dialogRect = editDialog.getBoundingClientRect();
+                                        let desiredLeft = (containerRect.width - dialogRect.width) / 2 + containerRect.left;
+                                        let desiredTop = (containerRect.height - dialogRect.height) / 2 + containerRect.top;
+                                        
+                                        const clampedLeft = Math.max(
+                                            containerRect.left + 10, 
+                                            Math.min(containerRect.right - dialogRect.width - 10, desiredLeft)
+                                        );
+                                        const clampedTop = Math.max(
+                                            containerRect.top + 10, 
+                                            Math.min(containerRect.bottom - dialogRect.height - 10, desiredTop)
+                                        );
+                                        editDialog.style.left = clampedLeft + 'px';
+                                        editDialog.style.top = clampedTop + 'px';
+                                        editDialog.style.transform = 'none'; 
+                                    });
+                                    
+                                };
+                                showEditPresetDialog(preset, presetLabel, categorySection, categoryData, presetsList);
+                            }
+                        });
+                        
+                        editPresetBtn.style.background = 'none';
+                        editPresetBtn.style.border = 'none';
+                        editPresetBtn.style.padding = '2px';
+                        editPresetBtn.style.opacity = '0.7';
+                        editPresetBtn.style.fontSize = '11px';
+                         
+
+                        const deletePresetBtn = DialogUtils.createButton(THEME, {
+                            innerHTML: '🗑️',
+                            title: 'Delete preset',
+                            className: 'multitext-manage-presets-action-button delete', 
+                            onclick: (e) => {
+                                e.stopPropagation();
+                                if (confirm(`Are you sure you want to delete the preset \"${preset.label}\"?`)) {
+                                    const presetIndex = categoryData.presets.indexOf(preset);
+                                    if (presetIndex > -1) {
+                                        categoryData.presets.splice(presetIndex, 1);
+                                        localStorage.setItem('multitext_category_presets', JSON.stringify(THEME.promptPresets));
+                                        presetItem.remove();
+                                        if (categoryData.presets.length === 0) {
+                                            categorySection.remove();
+                                        }
+                                    }
+                                }
+                                this._showDeletePresetDialog(preset);
+                                const presetItemElement = deleteBtn.closest('.multitext-manage-presets-item');
+                                if (presetItemElement) presetItemElement.remove();
+                                if (categoryData.presets.length === 0) {
+                                    const categorySectionElement = deleteBtn.closest('.multitext-manage-presets-category-section');
+                                     if (categorySectionElement) categorySectionElement.remove();
+                                }
+                            }
+                        });
+                        
+                        deletePresetBtn.style.background = 'none';
+                        deletePresetBtn.style.border = 'none';
+                        deletePresetBtn.style.padding = '2px';
+                        deletePresetBtn.style.opacity = '0.7';
+                        deletePresetBtn.style.fontSize = '11px';
+                        
+
+                        [editPresetBtn, deletePresetBtn].forEach(btn => {
+                            btn.onmouseover = () => btn.style.opacity = '1';
+                            btn.onmouseout = () => btn.style.opacity = '0.7';
+                        }); 
+
+                        buttonsContainer.appendChild(editPresetBtn);
+                        buttonsContainer.appendChild(deletePresetBtn);
+                        presetItem.appendChild(presetLabel);
+                        presetItem.appendChild(buttonsContainer);
+                        presetsList.appendChild(presetItem);
+                    });
+                    categoryHeader.appendChild(categoryTitle);
+                    categoryHeader.appendChild(addPresetBtn);
+                    categorySection.appendChild(categoryHeader);
+                    categorySection.appendChild(presetsList);
+                    contentContainer.appendChild(categorySection);
+                });
+                managementDialog.appendChild(contentContainer);
+                document.body.appendChild(managementDialog);
+
+                
+                requestAnimationFrame(() => { 
+                    const container = document.querySelector('.graph-canvas-container') || document.body;
+                    const containerRect = container.getBoundingClientRect();
+                    const dialogRect = managementDialog.getBoundingClientRect();
+                    let desiredLeft = (containerRect.width - dialogRect.width) / 2 + containerRect.left;
+                    let desiredTop = (containerRect.height - dialogRect.height) / 2 + containerRect.top;
+                    
+                    const clampedLeft = Math.max(
+                        containerRect.left,
+                        Math.min(containerRect.right - dialogRect.width, desiredLeft)
+                    );
+                    const clampedTop = Math.max(
+                        containerRect.top,
+                        Math.min(containerRect.bottom - dialogRect.height, desiredTop)
+                    );
+                    managementDialog.style.left = clampedLeft + 'px';
+                    managementDialog.style.top = clampedTop + 'px';
+                    managementDialog.style.transform = 'none'; 
+                });
+
+                const closeDialogOnClickOutside = (e) => {
+                    if (!managementDialog.contains(e.target)) {
+                       closeManageDialog();
+                    }
+                };
+                document.addEventListener('mousedown', closeDialogOnClickOutside);
+            };
+            categoryContainer.appendChild(editButton);
+            presetContainer.appendChild(categoryContainer);
+            presetContainer.appendChild(presetsContainer);
+            contentWrapper.appendChild(presetContainer);
+
+            
             const templateSection = document.createElement('div');
-            templateSection.style.cssText = `
-                margin-bottom: 16px;
-                border-radius: 8px;
-                background: ${THEME.colors.bgActive}20;
-                padding: 12px;
-            `;
-
+            templateSection.classList.add('multitext-dialog-template-section');
             const templateHeader = document.createElement('div');
-            templateHeader.style.cssText = `
-                display: flex;
-                align-items: center;
-                justify-content: space-between;
-                margin-bottom: 12px;
-                cursor: pointer;
-                user-select: none;
-            `;
-
+            templateHeader.classList.add('multitext-dialog-template-header');
             const templateTitle = document.createElement('div');
-            templateTitle.innerHTML = '📝 Ready Templates ';
-            templateTitle.style.cssText = `
-                font-size: 13px;
-                font-weight: 500;
-                color: ${THEME.colors.textDim};
-            `;
-
+            templateTitle.innerHTML = '📝 Ready Templates';             templateTitle.classList.add('multitext-dialog-template-title'); 
             const toggleIcon = document.createElement('div');
             toggleIcon.textContent = '▼';
-            toggleIcon.style.cssText = `
-                font-size: 12px;
-                color: ${THEME.colors.textDim};
-                transition: transform 0.2s;
-            `;
-
+            toggleIcon.classList.add('multitext-dialog-template-toggle');
             templateHeader.appendChild(templateTitle);
             templateHeader.appendChild(toggleIcon);
             templateSection.appendChild(templateHeader);
-
             const templateGrid = document.createElement('div');
-            templateGrid.style.cssText = `
-                display: grid;
-                grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-                gap: 8px;
-                overflow-y: auto;
-                max-height: 0px;
-                transition: max-height 0.3s ease-out;
-                padding-right: 8px;
-                margin-right: -8px;
-                scrollbar-width: thin;
-                scrollbar-color: ${THEME.colors.border} transparent;
-
-                &::-webkit-scrollbar {
-                    width: 6px;
-                }
-                &::-webkit-scrollbar-track {
-                    background: transparent;
-                }
-                &::-webkit-scrollbar-thumb {
-                    background-color: ${THEME.colors.border};
-                    border-radius: 3px;
-                }
-            `;
-
+            templateGrid.classList.add('multitext-dialog-template-grid');
             let isTemplatesVisible = false;
             const toggleTemplates = () => {
                 isTemplatesVisible = !isTemplatesVisible;
-                toggleIcon.style.transform = isTemplatesVisible ? 'rotate(180deg)' : 'rotate(0)';
-                templateGrid.style.maxHeight = isTemplatesVisible ? '500px' : '0';
-                templateGrid.style.marginTop = isTemplatesVisible ? '12px' : '0';
+                toggleIcon.classList.toggle('rotated', isTemplatesVisible); 
+                templateGrid.classList.toggle('visible', isTemplatesVisible); 
             };
-
             templateHeader.onclick = toggleTemplates;
-
             Object.entries(THEME.promptTemplates).forEach(([category, { icon, label, templates }]) => {
+                if (!Array.isArray(templates)) {
+                     console.warn(`Templates for category '${category}' is not an array. Skipping.`);
+                     return; 
+                 }
                 templates.forEach(template => {
                     const templateBtn = document.createElement('button');
-                    templateBtn.style.cssText = `
-                        background: ${THEME.colors.bgActive};
-                        border: 1px solid ${THEME.colors.border};
-                        border-radius: 6px;
-                        padding: 8px;
-                        color: ${THEME.colors.text};
-                        font-size: 12px;
-                        cursor: pointer;
-                        text-align: left;
-                        width: 100%;
-                        transition: all 0.2s;
-                        &:hover {
-                            background: ${THEME.colors.bgHover};
-                            border-color: ${THEME.colors.accent};
-                        }
-                    `;
-
-                    const templateHeader = document.createElement('div');
-                    templateHeader.style.cssText = `
-                        display: flex;
-                        align-items: center;
-                        gap: 4px;
-                        margin-bottom: 4px;
-                        font-weight: 500;
-                    `;
-                    templateHeader.innerHTML = `${icon} ${template.name}`;
-                    
+                    templateBtn.classList.add('multitext-dialog-template-button'); 
+                    const templateBtnHeader = document.createElement('div');
+                    templateBtnHeader.classList.add('multitext-dialog-template-button-header'); 
+                    templateBtnHeader.innerHTML = `${icon || '📝'} ${template.name}`;
                     const templateInfo = document.createElement('div');
-                    templateInfo.style.cssText = `
-                        font-size: 11px;
-                        color: ${THEME.colors.textDim};
-                        display: flex;
-                        justify-content: space-between;
-                        margin-top: 4px;
-                    `;
+                    templateInfo.classList.add('multitext-dialog-template-button-info'); 
                     templateInfo.innerHTML = `
-                        <span>${label}</span>
-                        <span>${template.weight.toFixed(1)}</span>
+                        <span>${label || category}</span>
+                        <span>${template.weight ? template.weight.toFixed(1) : '-'}</span>
                     `;
-
-                    templateBtn.appendChild(templateHeader);
+                    const editIcon = document.createElement('div');
+                    editIcon.classList.add('multitext-template-edit-icon');
+                    editIcon.innerHTML = '⋮';
+                    editIcon.title = 'Edit template';
+                    editIcon.onclick = (e) => {
+                        e.stopPropagation(); 
+                        
+                        this.showSaveTemplateDialog(
+                            template.prompt, 
+                            template.weight, 
+                            dialog,
+                            template.name,
+                            category
+                        );
+                    };
+                    templateBtn.appendChild(editIcon);
+                    templateBtn.appendChild(templateBtnHeader); 
                     templateBtn.appendChild(templateInfo);
-
                     templateBtn.onclick = () => {
                         textarea.value = template.prompt;
-                        weightInput.value = template.weight;
+                        if (template.weight !== undefined) { 
+                            weightInput.value = template.weight;
+                        }
                         textarea.dispatchEvent(new Event('input'));
-                    };
 
+                        
+                        const textWidget = this.widgets.find(w => w.name === `text${dialog.dataset.promptIndex}`);
+                        const weightWidget = this.widgets.find(w => w.name === `weight${dialog.dataset.promptIndex}`);
+                        if (textWidget) {
+                            textWidget.value = textarea.value;
+                        }
+                        if (weightWidget && template.weight !== undefined) {
+                            weightWidget.value = parseFloat(weightInput.value);
+                        }
+                        
+                    };
                     templateGrid.appendChild(templateBtn);
                 });
             });
-
             templateSection.appendChild(templateGrid);
             contentWrapper.appendChild(templateSection);
-
-
-
-            dialog.appendChild(content);
+            dialog.appendChild(content); 
             document.body.appendChild(dialog);
-            // 1) Get the graph container’s bounding box
-            const container = document.querySelector('.graph-canvas-container');
-            const containerRect = container.getBoundingClientRect();
 
-            // 2) Position the dialog (desiredLeft, desiredTop = where you'd like it to go)
+            
+            const container = document.querySelector('.graph-canvas-container');
+            const containerRect = container ? container.getBoundingClientRect() : { left: 0, top: 0, right: window.innerWidth, bottom: window.innerHeight };
             const dialogRect = dialog.getBoundingClientRect();
             let desiredLeft = (window.innerWidth - dialogRect.width) / 2;
             let desiredTop  = (window.innerHeight - dialogRect.height) / 2;
-
-            // 3) Clamp so the dialog stays fully within containerRect
-            //    (left/right, top/bottom)
             const clampedLeft = Math.max(
-            containerRect.left,
-            Math.min(containerRect.right - dialogRect.width, desiredLeft)
+                containerRect.left,
+                Math.min(containerRect.right - dialogRect.width, desiredLeft)
             );
-
             const clampedTop = Math.max(
-            containerRect.top,
-            Math.min(containerRect.bottom - dialogRect.height, desiredTop)
+                containerRect.top,
+                Math.min(containerRect.bottom - dialogRect.height, desiredTop)
             );
-
-            // 4) Apply the clamped coords
             dialog.style.left = clampedLeft + 'px';
             dialog.style.top  = clampedTop + 'px';
             dialog.style.transform = 'none';
-
             textarea.focus();
 
+            
+            dialog.textarea = textarea;
+            dialog.weightInput = weightInput;
         } catch (error) {
-            console.error('Dialog oluşturma hatası:', error);
+            console.error('Dialog creation error:', error);
         }
     },
-
     onDrawForeground(ctx) {
         if (!ctx || this.flags.collapsed) return;
-
-        const margin = STYLES.row.padding;
-        const rowHeight = STYLES.row.height;
-        const rowMargin = STYLES.row.margin;
+        const prLayout = THEME.layout.promptRow; 
+        const margin = prLayout.padding;
+        const rowHeight = prLayout.height;
+        const rowMargin = prLayout.margin;
         const rowWidth = this.size[0] - (margin * 2);
         let y = margin;
-
         for (let i = 0; i < this.activePrompts; i++) {
             const labelWidget  = this.widgets.find(w => w.name === `label${i+1}`);
             const textWidget = this.widgets.find(w => w.name === `text${i + 1}`);
             const weightWidget = this.widgets.find(w => w.name === `weight${i + 1}`);
-            const enabledWidget = this.widgets.find(w => w.name === `enabled${i+1}`);
-            
+                const enabledWidget = this.widgets.find(w => w.name === `enabled${i+1}`);
             if (labelWidget && textWidget && weightWidget) {
                 if (i === this.currentHoverIndex) {
                     UXUtils.drawHoverEffect(
@@ -1624,7 +1336,6 @@ const MultiTextNode = {
                         1
                     );
                 }
-
                 Renderer.drawPromptRow(
                     ctx, 
                     margin, 
@@ -1635,20 +1346,16 @@ const MultiTextNode = {
                     rowHeight,
                     4
                 );
-
-                // Draw a small toggle box on the left side:
                 this.drawToggle(
                     ctx,
-                    margin + 4,      // x offset
-                    y + rowHeight/2, // center y
-                    enabledWidget.value // true/false
+                    margin + 4,      
+                    y + rowHeight/2, 
+                    enabledWidget.value 
                 );
                 y += rowHeight + rowMargin;
             }
         }
-
         this.drawControlButtons(ctx);
-
         if (this.tooltipState.visible) {
             UXUtils.drawTooltip(
                 ctx,
@@ -1658,91 +1365,39 @@ const MultiTextNode = {
             );
         }
     },
-
     drawToggle(ctx, x, centerY, isEnabled) {
-        const width = 30;  // Width of the switch
-        const height = 14;  // Height of the switch
-        const radius = height / 2;  // Rounded corners
+        const size = 10;
         const toggleX = x;
-        const toggleY = centerY - height / 2;
-    
-        // Background color (track)
+        const toggleY = centerY - size/2;
         ctx.save();
-        ctx.fillStyle = isEnabled ? THEME.colors.accent : THEME.colors.border;
+        ctx.fillStyle = isEnabled ? THEME.colors.accent : THEME.colors.bg;
+        ctx.strokeStyle = isEnabled ? THEME.colors.accent : THEME.colors.border;
+        ctx.lineWidth = 1;
         ctx.beginPath();
-        ctx.roundRect(toggleX, toggleY, width, height, radius);
+        ctx.roundRect(toggleX, toggleY, size, size, 2);
         ctx.fill();
-    
-        // Handle (circle inside)
-        const handleRadius = radius - 2;
-        const handleX = isEnabled ? toggleX + width - handleRadius * 2 - 2 : toggleX + 2;
-        const handleY = toggleY + 2;
-    
-        ctx.fillStyle = THEME.colors.text;
-        ctx.beginPath();
-        ctx.arc(handleX + handleRadius, handleY + handleRadius, handleRadius, 0, Math.PI * 2);
-        ctx.fill();
-    
+        if (!isEnabled) ctx.stroke();
+        if (isEnabled) {
+            ctx.fillStyle = THEME.colors.text;
+            ctx.beginPath();
+            ctx.arc(
+                toggleX + size/2,
+                toggleY + size/2,
+                size/4,
+                0,
+                Math.PI * 2
+            );
+            ctx.fill();
+        }
         ctx.restore();
     },    
-
-    drawPromptRow(ctx, x, y, index, text, weight) {
-        const rowWidth = this.size[0] - (STYLES.row.padding * 2);
-        const centerY = y + (STYLES.row.height/2) + 4;
-        
-        const maxTextWidth = rowWidth - STYLES.weight.width;
-        
-        const displayText = text || `Prompt ${index + 1}`;
-        Renderer.drawPromptRow(ctx, x, y, displayText, weight, rowWidth);
-    },
-
-    updateCache() {
-        const canvas = document.createElement('canvas');
-        canvas.width = this.size[0];
-        canvas.height = this.size[1];
-        const ctx = canvas.getContext('2d');
-        
-        if (!ctx) return;
-        
-        this.drawNodeContents(ctx);
-        this.cachedCanvas = canvas;
-        this.lastUpdate = Date.now();
-    },
-
-    drawFromCache(ctx) {
-        if (!ctx || this.flags.collapsed) return;
-        
-        if (this.cachedCanvas) {
-            ctx.drawImage(this.cachedCanvas, 0, 0);
-        }
-    },
-
-    drawWeightValue(ctx, x, y, weight) {
-        const width = 32;
-        const height = 3;
-        ctx.fillStyle = THEME.colors.bgActive;
-        ctx.fillRect(x, y + 28, width, height);
-        ctx.fillStyle = THEME.colors.accent;
-        ctx.fillRect(x, y + 28, width * (weight / 2), height);
-    },
-
-    requestDraw() {
-        if (this._drawRequested) return;
-        this._drawRequested = true;
-        requestAnimationFrame(() => {
-            this._drawRequested = false;
-            this.setDirtyCanvas(true);
-        });
-    },
-
     getHoveredWidgetIndex(pos) {
-        const margin = STYLES.row.padding;
-        const rowHeight = STYLES.row.height;
-        const rowMargin = STYLES.row.margin;
-        
+        const prLayout = THEME.layout.promptRow; 
+        const margin = prLayout.padding;
+        const rowHeight = prLayout.height;
+        const rowMargin = prLayout.margin;
         const relativeY = pos[1] - margin;
         const rowIndex = Math.floor(relativeY / (rowHeight + rowMargin));
-        
         if (rowIndex >= 0 && 
             rowIndex < this.activePrompts && 
             pos[0] >= margin && 
@@ -1751,153 +1406,138 @@ const MultiTextNode = {
             relativeY <= this.activePrompts * (rowHeight + rowMargin)) {
             return rowIndex;
         }
-        
         return -1;
     },
 
-    updateAnimations() {
-        this.hoverStates.forEach(state => {
-            if (state.isHovered && state.progress < 1) {
-                state.progress = Math.min(1, state.progress + 0.1);
-            } else if (!state.isHovered && state.progress > 0) {
-                state.progress = Math.max(0, state.progress - 0.1);
-            }
-        });
-
-        if (this.hoverStates.some(state => state.progress > 0 && state.progress < 1) ||
-            this.ripples.length > 0) {
-            this.requestDraw();
+    loadPromptHistory() {
+        try {
+            const history = localStorage.getItem('multitext_history');
+            return history ? JSON.parse(history) : [];
+        } catch (error) {
+            console.error('Error loading history:', error);
+            return [];
         }
     },
-
-    loadPromptHistory() {
-        return JSON.parse(localStorage.getItem('multitext_history') || '[]');
-    },
-
     saveToHistory(text) {
         if (!text?.trim()) return;
-        
         try {
             const history = this.loadPromptHistory();
             const newItem = { text, timestamp: Date.now() };
-            
             const existingIndex = history.findIndex(item => item.text === text);
+            
             if (existingIndex !== -1) {
+                
                 history[existingIndex] = newItem;
-            } else {
+                        } else {
+                
                 history.unshift(newItem);
             }
             
-            localStorage.setItem('multitext_history', JSON.stringify(history.slice(0, 20)));
+            
+            const trimmedHistory = history.slice(0, 20);
+            localStorage.setItem('multitext_history', JSON.stringify(trimmedHistory));
+            
         } catch (error) {
-            console.error('Error saving history:', error);
+            console.error('Error saving to history:', error);
         }
     },
-
     handleQuickAction(action, textarea) {
         switch (action) {
+            case 'weight':
+                const weightInput = document.querySelector('.multitext-dialog-weight-input');
+                if (weightInput) {
+                    weightInput.focus();
+                    weightInput.select();
+                }
+                break;
             case 'clear':
                 if (textarea.value) {
                     textarea.value = '';
                     textarea.dispatchEvent(new Event('input'));
                 }
                 break;
+            case 'default':
+                
+                if (confirm("This will remove all custom presets and templates and restore defaults. Are you sure?")) {
+                    localStorage.removeItem('multitext_category_presets');
+                    localStorage.removeItem('multitext_templates');
+                    alert("Custom presets and templates cleared. Please reload the UI or node for changes to take full effect.");
+                    
+                    const dialog = document.querySelector(`.multitext-dialog[data-prompt-index="${textarea.closest('.multitext-dialog')?.dataset.promptIndex}"]`);
+                    dialog?.remove();
+                }
+                break;
         }
     },
-
     addPrompt() {
         if (this.activePrompts < this.maxPrompts) {
             this.activePrompts++;
-    
-            // **Find the new enabledX widget and disable it by default**
             const newEnabledWidget = this.widgets.find(w => w.name === `enabled${this.activePrompts}`);
             if (newEnabledWidget) {
                 newEnabledWidget.value = false;
             }
-    
             localStorage.setItem('multitext_prompt_count', this.activePrompts.toString());
             this.updateNodeSize();
-            this.setDirtyCanvas(true);
-        }
+                    this.setDirtyCanvas(true);
+                }
     },    
-
     removePrompt() {
         if (this.activePrompts > 1) {
             const index = this.activePrompts;
             const textWidget = this.widgets.find(w => w.name === `text${index}`);
             const weightWidget = this.widgets.find(w => w.name === `weight${index}`);
-            
             if (textWidget) textWidget.value = "";
             if (weightWidget) weightWidget.value = 1.0;
-            
             this.activePrompts--;
             localStorage.setItem('multitext_prompt_count', this.activePrompts.toString());
-            this.updateNodeSize();
+        this.updateNodeSize();
             this.setDirtyCanvas(true);
         }
     },
-
     isInsideControlButtons(x, y) {
-        const margin = STYLES.row.padding;
+        const prLayout = THEME.layout.promptRow; 
+        const margin = prLayout.padding;
         const buttonSize = THEME.controls.button.size;
         const buttonMargin = THEME.controls.button.margin;
-        
-        const controlsY = margin + (this.activePrompts * (STYLES.row.height + STYLES.row.margin)) + buttonMargin;
-        const addX = this.size[0] - margin - buttonSize;
-        const removeX = addX - buttonSize - buttonMargin;
-        const separatorX = margin;
-        const toggleX = margin + buttonSize + buttonMargin + 10; // Toggle position
-        const toggleWidth = 40;
-        const toggleHeight = 20;
-
+        const controlsY = margin + (this.activePrompts * (prLayout.height + prLayout.margin)) + buttonMargin;
+        const removeX = margin; 
+        const addX = removeX + buttonSize + 4; 
+        const separatorX = addX + buttonSize + 4; 
+        const toggleX = this.size[0] - margin - 80;
+        const toggleWidth = 80; 
+        const toggleHeight = 20; 
+        const toggleY = controlsY - 2; 
         return {
-            add: x >= addX && x <= addX + buttonSize && 
-                 y >= controlsY && y <= controlsY + buttonSize,
             remove: x >= removeX && x <= removeX + buttonSize && 
                    y >= controlsY && y <= controlsY + buttonSize,
+            add: x >= addX && x <= addX + buttonSize && 
+                 y >= controlsY && y <= controlsY + buttonSize,
             separator: x >= separatorX && x <= separatorX + buttonSize && 
                       y >= controlsY && y <= controlsY + buttonSize,
             toggle: x >= toggleX && x <= toggleX + toggleWidth && 
-                    y >= controlsY && y <= controlsY + toggleHeight 
+                   y >= toggleY && y <= toggleY + toggleHeight
         };
-    },
-
+    },    
     drawControlButtons(ctx) {
-        const margin = STYLES.row.padding;
+        const prLayout = THEME.layout.promptRow; 
+        const margin = prLayout.padding;
         const buttonSize = THEME.controls.button.size;
         const buttonMargin = THEME.controls.button.margin;
-        const toggleX = margin + buttonSize + buttonMargin + 20; // Position right of separator
-
-        const y = margin + (this.activePrompts * (STYLES.row.height + STYLES.row.margin)) + buttonMargin;
-        const addX = this.size[0] - margin - buttonSize;
-        const removeX = addX - buttonSize - buttonMargin;
-
-        const separatorX = margin;
-        ctx.fillStyle = THEME.controls.button.colors.bg;
-        Utils.drawRoundedRect(ctx, separatorX, y, buttonSize, buttonSize, THEME.controls.button.borderRadius);
-        
-        ctx.fillStyle = THEME.controls.button.colors.text;
-        ctx.font = '16px Arial';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText('⋮', separatorX + buttonSize/2, y + buttonSize/2);
-
-         // **Toggle Switch for Single/Multi-Prompt Mode**
-        this.drawToggleSwitch(ctx, toggleX, y, buttonSize, this.isSinglePromptMode);
-
+        const y = margin + (this.activePrompts * (prLayout.height + prLayout.margin)) + buttonMargin;
+        const removeX = margin; 
+        const addX = removeX + buttonSize + 4; 
+        const separatorX = addX + buttonSize + 4; 
+        const toggleX = this.size[0] - margin - 60; 
         ctx.fillStyle = this.activePrompts > 1 ? THEME.controls.button.colors.bg : THEME.controls.button.colors.bgDisabled;
         Utils.drawRoundedRect(ctx, removeX, y, buttonSize, buttonSize, THEME.controls.button.borderRadius);
-        
         ctx.strokeStyle = this.activePrompts > 1 ? THEME.controls.button.colors.text : THEME.controls.button.colors.textDisabled;
         ctx.lineWidth = 2;
         ctx.beginPath();
         ctx.moveTo(removeX + 6, y + buttonSize/2);
         ctx.lineTo(removeX + buttonSize - 6, y + buttonSize/2);
         ctx.stroke();
-
         ctx.fillStyle = this.activePrompts < this.maxPrompts ? THEME.controls.button.colors.bg : THEME.controls.button.colors.bgDisabled;
         Utils.drawRoundedRect(ctx, addX, y, buttonSize, buttonSize, THEME.controls.button.borderRadius);
-        
         ctx.strokeStyle = this.activePrompts < this.maxPrompts ? THEME.controls.button.colors.text : THEME.controls.button.colors.textDisabled;
         ctx.beginPath();
         ctx.moveTo(addX + 6, y + buttonSize/2);
@@ -1905,86 +1545,93 @@ const MultiTextNode = {
         ctx.moveTo(addX + buttonSize/2, y + 6);
         ctx.lineTo(addX + buttonSize/2, y + buttonSize - 6);
         ctx.stroke();
+        ctx.fillStyle = THEME.controls.button.colors.bg;
+        Utils.drawRoundedRect(ctx, separatorX, y, buttonSize, buttonSize, THEME.controls.button.borderRadius);
+        ctx.fillStyle = THEME.controls.button.colors.text;
+        ctx.font = '16px Arial';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('⋮', separatorX + buttonSize/2, y + buttonSize/2);
+        this.drawToggleSwitch(ctx, toggleX, y, buttonSize, this.isSinglePromptMode);
     },
-
     drawToggleSwitch(ctx, x, y, size, isSingleMode) {
-        const width = 40; // Toggle width
-        const height = 20; // Toggle height
+        const width = 28;
+        const height = 16;
         const radius = height / 2;
-        const offset = 15; // Shift to the right by 10px
-        const toggleX = x + offset; // Shifted toggle position
+        const offset = 30;
+        const toggleX = x + offset;
         const toggleY = y + (size - height) / 2;
-    
-        // Labels
-        ctx.fillStyle = THEME.colors.textDim;
-        ctx.font = `12px ${THEME.typography.fonts.primary}`;
+        ctx.save();
+        ctx.font = `600 6px ${THEME.typography.fonts.primary}`;
+        ctx.textBaseline = "middle";
         ctx.textAlign = "right";
-        ctx.fillText("Multi", toggleX - 5, toggleY + height / 1.5); // Left Label
-    
-        ctx.textAlign = "left";
-        ctx.fillText("Single", toggleX + width + 4, toggleY + height / 1.5); // Right Label
-    
-        // Background (track)
-        ctx.fillStyle = isSingleMode ? THEME.colors.accent : THEME.colors.border;
+        ctx.fillStyle = THEME.colors.text;
+        ctx.fillText(isSingleMode ? "Single" : "Multi", toggleX - 4, toggleY + height/2);
         ctx.beginPath();
+        ctx.fillStyle = isSingleMode ? 
+            `rgba(${parseInt(THEME.colors.accent.slice(1,3),16)}, ${parseInt(THEME.colors.accent.slice(3,5),16)}, ${parseInt(THEME.colors.accent.slice(5,7),16)}, 0.15)` : 
+            'rgba(45, 45, 45, 0.2)';
         ctx.roundRect(toggleX, toggleY, width, height, radius);
         ctx.fill();
-    
-        // Handle (circle)
-        const handleRadius = radius - 3;
-        const handleX = isSingleMode ? toggleX + width - handleRadius * 2 - 4 : toggleX + 4;
-        const handleY = toggleY + 4;
-    
-        ctx.fillStyle = THEME.colors.text;
+        ctx.strokeStyle = isSingleMode ? THEME.colors.accent : THEME.colors.border;
+        ctx.lineWidth = 1;
+        ctx.stroke();
+        const handleRadius = height / 2 - 3;
+        const handleX = isSingleMode ? toggleX + width - (handleRadius * 2) - 3 : toggleX + 3;
+        const handleY = toggleY + 3;
+        ctx.shadowColor = 'rgba(0, 0, 0, 0.1)';
+        ctx.shadowBlur = 2;
+        ctx.shadowOffsetY = 1;
+        const handleGradient = ctx.createLinearGradient(handleX, handleY, handleX, handleY + handleRadius * 2);
+        handleGradient.addColorStop(0, isSingleMode ? THEME.colors.accent : '#FFFFFF');
+        handleGradient.addColorStop(1, isSingleMode ? THEME.colors.accentLight : '#F0F0F0');
         ctx.beginPath();
+        ctx.fillStyle = handleGradient;
         ctx.arc(handleX + handleRadius, handleY + handleRadius, handleRadius, 0, Math.PI * 2);
         ctx.fill();
+        ctx.strokeStyle = isSingleMode ? THEME.colors.accentLight : THEME.colors.border;
+        ctx.lineWidth = 0.5;
+        ctx.stroke();
+        ctx.restore();
     },    
-
     updateNodeSize() {
-        const margin = STYLES.row.padding;
-        const rowHeight = STYLES.row.height;
-        const rowMargin = STYLES.row.margin;
+        const prLayout = THEME.layout.promptRow; 
+        const margin = prLayout.padding;
+        const rowHeight = prLayout.height;
+        const rowMargin = prLayout.margin;
         const buttonSize = THEME.controls.button.size;
         const buttonMargin = THEME.controls.button.margin;
-
         const totalHeight = margin + 
                            (this.activePrompts * (rowHeight + rowMargin)) + 
                            buttonMargin + 
                            buttonSize + 
                            margin;
-
-        this.size[0] = Math.max(280, this.size[0]);
+        this.size[0] = Math.max(THEME.layout.minNodeWidth, this.size[0]); 
         this.size[1] = totalHeight;
         this.setDirtyCanvas(true);
     },
-
     onResize(size) {
-        const margin = STYLES.row.padding;
-        const rowHeight = STYLES.row.height;
-        const rowMargin = STYLES.row.margin;
+        const prLayout = THEME.layout.promptRow; 
+        const margin = prLayout.padding;
+        const rowHeight = prLayout.height;
+        const rowMargin = prLayout.margin;
         const buttonSize = THEME.controls.button.size;
         const buttonMargin = THEME.controls.button.margin;
-
         const minHeight = margin + 
                          (this.activePrompts * (rowHeight + rowMargin)) + 
                          buttonMargin + 
                          buttonSize + 
                          margin;
-
-        size[0] = Math.max(280, size[0]);
+        size[0] = Math.max(THEME.layout.minNodeWidth, size[0]); 
         size[1] = minHeight;
-
         return size;
     },
-
     onSerialize(o) {
         if (!o.widgets_values) {
             o.widgets_values = [];
         }
         o.active_prompts = this.activePrompts;
     },
-
     onConfigure(o) {
         if (o.active_prompts !== undefined) {
             this.activePrompts = o.active_prompts;
@@ -1992,397 +1639,388 @@ const MultiTextNode = {
         }
         this.updateNodeSize();
     },
-
-    onMouseMove(event, pos) {
+    onMouseMove(event, pos, ctx) {
         const index = this.getHoveredWidgetIndex(pos);
-        if(app.ui.settings.getSettingValue("SKB.ShowTooltips", false)){
+        if (!app.ui.settings.getSettingValue("SKB.ShowTooltips")) {
+            this.tooltipState.visible = false;
+            this.setDirtyCanvas(true);
+            return;
+        }
+
         if (this.currentHoverIndex === index) {
             if (this.tooltipState.visible) {
-                this.tooltipState.x = pos[0];
-                this.tooltipState.y = pos[1];
+                const canvasRect = ctx.canvas.getBoundingClientRect();
+                this.tooltipState.x = event.clientX - canvasRect.left;
+                this.tooltipState.y = event.clientY - canvasRect.top;
                 this.setDirtyCanvas(true);
             }
             return;
         }
-        
+
         this.currentHoverIndex = index;
-
-        this.visualWidgets.forEach((widget, i) => {
-            widget.isHovered = i === index;
-        });
-
-        if (index !== -1) {
-            const textWidget = this.widgets.find(w => w.name === `text${index + 1}`);
-            if (textWidget?.value) {
-                this.tooltipState = {
-                    visible: true,
-                    text: textWidget.value,
-                    x: pos[0],
-                    y: pos[1]
-                };
-            } else {
-                this.tooltipState.visible = false;
-            }
-        } else {
-            this.tooltipState.visible = false;
-        }
-
-        this.setDirtyCanvas(true);
-        } else {
-            this.tooltipState.visible = false;
-            this.setDirtyCanvas(true);
-        }
-
+        const textWidget = index !== -1 ? this.widgets.find(w => w.name === `text${index + 1}`) : null;
         
-    },
-
-    combine_text(separator=" ", active=true, kwargs) {
-        if (!active) {
-            return [""];
-        }
-    
-        const texts = [];
-    
-        for (let i = 1; i <= 20; i++) {
-            // Check if the prompt is enabled
-            const isEnabled = kwargs[`enabled${i}`];
-            if (isEnabled === false) {
-                // skip if disabled
-                continue;
-            }
-    
-            // parse weight safely (with fallback=1.0)
-            let weightRaw = kwargs[`weight${i}`];
-            if (weightRaw == null || isNaN(parseFloat(weightRaw))) {
-                weightRaw = 1.0;
-            }
-            const weight = parseFloat(weightRaw);
-    
-            const text = (kwargs[`text${i}`] || "").trim();
-            if (text) {
-                if (weight === 1.0) {
-                    texts.push(text);
-                } else {
-                    texts.push(`(${text}:${weight.toFixed(1)})`);
-                }
-            }
-        }
-    
-        return [texts.join(separator)];
-    },
-    
-
-    loadPresets() {
-        try {
-            const savedPresets = localStorage.getItem(this.PRESETS_KEY);
-            this.presets = savedPresets ? JSON.parse(savedPresets) : {};
-        } catch (error) {
-            console.error('Presetler yüklenemedi:', error);
-            this.presets = {};
-        }
-    },
-
-    deletePreset(name) {
-        delete this.presets[name];
-        try {
-            localStorage.setItem(this.PRESETS_KEY, JSON.stringify(this.presets));
-        } catch (error) {
-            console.error('Preset silinemedi:', error);
-        }
-    },
-
-    showPresetMenu(pos, ctx) {
-        const menu = document.createElement('div');
-        menu.style.cssText = `
-            position: fixed;
-            z-index: 10000;
-            background: ${THEME.colors.bg};
-            border: 1px solid ${THEME.colors.border};
-            border-radius: 8px;
-            box-shadow: 0 4px 16px rgba(0,0,0,0.2);
-            padding: 8px;
-            min-width: 200px;
-            max-height: 400px;
-            overflow-y: auto;
-            font-family: ${THEME.typography.fonts.primary};
-        `;
-
-        Object.entries(THEME.promptPresets).forEach(([category, { icon, presets }]) => {
-            if (presets && presets.length > 0) {
-                const categoryTitle = document.createElement('div');
-                categoryTitle.style.cssText = `
-                    padding: 8px 12px;
-                    color: ${THEME.colors.textDim};
-                    font-size: 13px;
-                    font-weight: 500;
-                    display: flex;
-                    align-items: center;
-                    gap: 8px;
-                `;
-                categoryTitle.innerHTML = `${icon} ${category.charAt(0).toUpperCase() + category.slice(1)}`;
-                menu.appendChild(categoryTitle);
-
-                presets.forEach(preset => {
-                    const item = document.createElement('div');
-                    item.style.cssText = `
-                        display: flex;
-                        align-items: center;
-                        padding: 6px 12px;
-                        cursor: pointer;
-                        border-radius: 4px;
-                        transition: background 0.1s;
-                        color: ${THEME.colors.text};
-                        font-size: 13px;
-                        position: relative;
-                    `;
-
-                    item.addEventListener('mouseenter', () => {
-                        item.style.background = THEME.colors.bgHover;
-                    });
-                    item.addEventListener('mouseleave', () => {
-                        item.style.background = 'transparent';
-                    });
-
-                    const label = document.createElement('span');
-                    label.textContent = preset.label;
-                    label.style.flex = '1';
-                    item.appendChild(label);
-
-                    const deleteBtn = document.createElement('span');
-                    deleteBtn.innerHTML = '✕';
-                    deleteBtn.style.cssText = `
-                        display: inline-block;
-                        margin-left: 8px;
-                        color: #ff4444;
-                        font-size: 14px;
-                        cursor: pointer;
-                        padding: 2px 6px;
-                    `;
-
-                    deleteBtn.onclick = (e) => {
-                        e.stopPropagation();
-                        if (confirm(`Are you sure you want to delete the preset "${preset.label}"?`)) {
-                            THEME.promptPresets[category].presets = THEME.promptPresets[category].presets.filter(p => 
-                                p.value !== preset.value || p.label !== preset.label
-                            );
-                            try {
-                                localStorage.setItem('multitext_category_presets', JSON.stringify(THEME.promptPresets));
-                                item.remove();
-                            } catch (error) {
-                                console.error('Preset silme hatası:', error);
-                            }
-                        }
-                    };
-
-                    item.onclick = () => {
-                        const textWidget = this.widgets.find(w => w.name === 'text1');
-                        if (textWidget) {
-                            textWidget.value = preset.value;
-                            if (textWidget.callback) textWidget.callback(preset.value);
-                        }
-                        menu.remove();
-                    };
-
-                    item.appendChild(deleteBtn);
-                    menu.appendChild(item);
-                });
-            }
-        });
-
-        const rect = ctx.canvas.getBoundingClientRect();
-        const [nodeX, nodeY] = this.pos;
-        const width = this.size[0];
-        
-        menu.style.left = `${rect.left + nodeX + width - 30}px`;
-        menu.style.top = `${rect.top + nodeY + 30}px`;
-
-        document.body.appendChild(menu);
-
-        const menuRect = menu.getBoundingClientRect();
-        if (menuRect.right > window.innerWidth) {
-            menu.style.left = `${window.innerWidth - menuRect.width - 10}px`;
-        }
-        if (menuRect.bottom > window.innerHeight) {
-            menu.style.top = `${window.innerHeight - menuRect.height - 10}px`;
-        }
-
-        const closeMenu = (e) => {
-            if (!menu.contains(e.target)) {
-                menu.remove();
-                document.removeEventListener('mousedown', closeMenu);
-            }
+        this.tooltipState = {
+            visible: textWidget?.value ? true : false,
+            text: textWidget?.value || '',
+            x: event.clientX - ctx.canvas.getBoundingClientRect().left,
+            y: event.clientY - ctx.canvas.getBoundingClientRect().top
         };
-        document.addEventListener('mousedown', closeMenu);
-    },
-
-    isInsidePresetButton(x, y) {
-        const [nodeX, nodeY] = this.pos;
-        const width = this.size[0];
-        const height = this.size[1];
         
-        const buttonX = nodeX + width - 30;
-        const buttonY = nodeY + 5;
+            this.setDirtyCanvas(true);
+        },        
+    showSavePresetDialog(text, weight, dialogToUpdate) {
         
-        const buttonWidth = 24;
-        const buttonHeight = 24;
-        
-        const isInside = x >= buttonX && x <= buttonX + buttonWidth && 
-                        y >= buttonY && y <= buttonY + buttonHeight;
-        
-        console.log("Preset buton kontrolü:", {
-            mouseX: x,
-            mouseY: y,
-            buttonX,
-            buttonY,
-            isInside
-        });
-        
-        return isInside;
-    },
-
-    showSavePresetDialog(text) {
-        const dialog = document.createElement('div');
-        dialog.style.cssText = `
-            position: fixed;
-            z-index: 10000;
-            background: ${THEME.colors.bg};
-            border: 1px solid ${THEME.colors.border};
-            border-radius: 8px;
-            box-shadow: 0 4px 16px rgba(0,0,0,0.2);
-            padding: 16px;
-            min-width: 300px;
-            font-family: ${THEME.typography.fonts.primary};
-            left: 50%;
-            top: 50%;
-            transform: translate(-50%, -50%);
-        `;
-
-        const title = document.createElement('div');
-        title.textContent = 'Preset Kaydet';
-        title.style.cssText = `
-            font-size: 16px;
-            font-weight: 600;
-            margin-bottom: 16px;
-            padding-bottom: 8px;
-            border-bottom: 1px solid ${THEME.colors.border};
-            color: ${THEME.colors.text};
-        `;
-        dialog.appendChild(title);
-
-        const nameInput = document.createElement('input');
-        nameInput.type = 'text';
-        nameInput.placeholder = 'Preset adı';
-        nameInput.style.cssText = `
-            width: 100%;
-            padding: 8px;
-            margin-bottom: 12px;
-            border: 1px solid ${THEME.colors.border};
-            border-radius: 4px;
-            background: ${THEME.colors.surface.base};
-            color: ${THEME.colors.text};
-            font-size: 14px;
-        `;
-        dialog.appendChild(nameInput);
-
-        const categorySelect = document.createElement('select');
-        categorySelect.style.cssText = `
-            width: 100%;
-            padding: 8px;
-            margin-bottom: 16px;
-            border: 1px solid ${THEME.colors.border};
-            border-radius: 4px;
-            background: ${THEME.colors.surface.base};
-            color: ${THEME.colors.text};
-            font-size: 14px;
-        `;
-
-        const categories = [
-            { value: 'quality', label: '✨ Quality' },
-            { value: 'style', label: '🎨 Style' },
-            { value: 'lighting', label: '💡 Lighting' },
-            { value: 'camera', label: '📷 Camera' },
-            { value: 'mood', label: '🎭 Mood' },
-            { value: 'environment', label: '🌍 Environment' }
-        ];
-
-        categories.forEach(category => {
-            const option = document.createElement('option');
-            option.value = category.value;
-            option.textContent = category.label;
-            categorySelect.appendChild(option);
+        const dialog = DialogUtils.createDialog(THEME, {
+            width: '400px',
+            maxHeight: '500px'
         });
 
-        dialog.appendChild(categorySelect);
+        
+        const closeButton = DialogUtils.createButton(THEME, {
+            icon: '<svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>',
+            title: 'Close',
+            onclick: () => dialog.remove()
+        });
+
+        
+        const header = DialogUtils.createHeader(THEME, 'Save Preset', [closeButton]);
+        dialog.appendChild(header);
+
+        const content = document.createElement('div');
+        content.classList.add('multitext-dialog-content');
+        content.style.padding = '16px';
+
+        
+        const nameInput = DialogUtils.createInput(THEME, {
+            placeholder: 'Optional preset name',
+            className: 'multitext-save-preset-input'
+        });
+        nameInput.style.marginBottom = '12px';
+
+        
+        const valueTextarea = DialogUtils.createTextarea(THEME, {
+            placeholder: 'Preset value (required)',
+            value: text || '',
+            className: 'multitext-dialog-textarea'
+        });
+        valueTextarea.style.marginBottom = '12px';
+
+        
+        valueTextarea.addEventListener('input', () => {
+            if (!nameInput.value.trim()) {
+                const firstLine = valueTextarea.value.split('\n')[0].trim();
+                const truncated = firstLine.length > 40 ? firstLine.substring(0, 37) + '...' : firstLine;
+                nameInput.placeholder = truncated || 'Optional preset name';
+            }
+        });
+
+        
+        const categorySelect = DialogUtils.createSelect(THEME, {
+            className: 'multitext-save-preset-select',
+            options: [
+                { value: 'quality', label: '✨ Quality' },
+                { value: 'style', label: '🎨 Style' },
+                { value: 'lighting', label: '💡 Lighting' },
+                { value: 'camera', label: '📷 Camera' },
+                { value: 'mood', label: '🎭 Mood' },
+                { value: 'environment', label: '🌍 Environment' }
+            ]
+        });
+
+        content.appendChild(nameInput);
+        content.appendChild(valueTextarea);
+        content.appendChild(categorySelect);
 
         const buttons = document.createElement('div');
-        buttons.style.cssText = `
-            display: flex;
-                gap: 8px;
-            justify-content: flex-end;
-        `;
+        buttons.classList.add('multitext-save-preset-buttons'); 
 
+        
         const cancelBtn = document.createElement('button');
-        cancelBtn.textContent = 'İptal';
-        cancelBtn.style.cssText = `
-            padding: 8px 16px;
-            border: 1px solid ${THEME.colors.border};
-            border-radius: 4px;
-            background: ${THEME.colors.surface.base};
-            color: ${THEME.colors.text};
-            cursor: pointer;
-                &:hover {
-                background: ${THEME.colors.surface.hover};
-            }
-        `;
+        cancelBtn.textContent = 'Cancel';
+        cancelBtn.classList.add('multitext-save-preset-button', 'multitext-save-preset-button-cancel');
         cancelBtn.onclick = () => dialog.remove();
 
-        const saveBtn = document.createElement('button');
-        saveBtn.textContent = 'Kaydet';
-        saveBtn.style.cssText = `
-            padding: 8px 16px;
-            border: none;
-                border-radius: 4px;
-            background: ${THEME.colors.accent};
-            color: white;
-            cursor: pointer;
-                &:hover {
-                background: ${THEME.colors.accentLight};
-            }
-        `;
         
-        saveBtn.onclick = () => {
-            const name = nameInput.value.trim();
+        const saveBtn = document.createElement('button');
+        saveBtn.textContent = 'Save';
+        saveBtn.classList.add('multitext-save-preset-button', 'multitext-save-preset-button-save');
+        saveBtn.onclick = async () => {
+            const value = valueTextarea.value.trim();
+            if (!value) {
+                alert("Please enter a preset value.");
+                return;
+            }
+
+            const name = nameInput.value.trim() || value.split('\n')[0].trim();
             const category = categorySelect.value;
-            
-            if (name) {
-                if (!THEME.promptPresets[category].presets) {
+
+            if (!category) {
+                alert("Please select a category.");
+                return;
+            }
+
+            try {
+                
+                if (!THEME.promptPresets[category]) {
+                    THEME.promptPresets[category] = { presets: [] };
+                } else if (!Array.isArray(THEME.promptPresets[category].presets)) {
                     THEME.promptPresets[category].presets = [];
                 }
-                
+
                 THEME.promptPresets[category].presets = THEME.promptPresets[category].presets.filter(preset => 
-                    preset.value !== text && preset.label !== name
+                    preset.label !== name
                 );
+
                 
                 THEME.promptPresets[category].presets.push({
-                    value: text,
-                    label: name
+                    value: valueTextarea.value.trim(), 
+                    label: name,
+                    weight: 1.0 
                 });
 
                 try {
                     localStorage.setItem('multitext_category_presets', JSON.stringify(THEME.promptPresets));
-                    console.log(`Preset "${name}" başarıyla ${category} kategorisine kaydedildi`);
-                } catch (error) {
-                    console.error('Preset kaydetme hatası:', error);
-                }
+                    console.log(`Preset \"${name}\" successfully saved to ${category} category`);
 
-                dialog.remove();
-                this.setDirtyCanvas(true);
+                    dialog.remove();
+
+                    
+                    
+                    
+                    
+                } catch (error) {
+                    console.error('Error saving preset:', error);
+                    alert('Failed to save preset. Please try again.');
+                    dialog.remove(); 
+                }
+            } catch (error) {
+                console.error('Error saving preset:', error);
+                alert('Failed to save preset. Please try again.');
+                dialog.remove(); 
             }
         };
 
         buttons.appendChild(cancelBtn);
         buttons.appendChild(saveBtn);
-        dialog.appendChild(buttons);
+        content.appendChild(buttons);
+
+        nameInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                saveBtn.click();
+            }
+        });
+
+        dialog.appendChild(content);
+
+        document.body.appendChild(dialog);
+
+        
+        const cleanupDragSavePreset = this._makeDialogDraggable(dialog, header);
+        requestAnimationFrame(() => { 
+            const container = document.querySelector('.graph-canvas-container') || document.body;
+            const containerRect = container.getBoundingClientRect();
+            const dialogRect = dialog.getBoundingClientRect();
+            let desiredLeft = (containerRect.width - dialogRect.width) / 2 + containerRect.left;
+            let desiredTop = (containerRect.height - dialogRect.height) / 2 + containerRect.top;
+            
+            const clampedLeft = Math.max(
+                containerRect.left + 10, 
+                Math.min(containerRect.right - dialogRect.width - 10, desiredLeft)
+            );
+            const clampedTop = Math.max(
+                containerRect.top + 10, 
+                Math.min(containerRect.bottom - dialogRect.height - 10, desiredTop)
+            );
+            dialog.style.left = clampedLeft + 'px';
+            dialog.style.top = clampedTop + 'px';
+            dialog.style.transform = 'none'; 
+        });
+        
+
+        nameInput.focus();
+    },
+    showSaveTemplateDialog(promptText, promptWeight, dialogToUpdate, existingName = '', existingCategory = '') {
+        
+        const dialog = DialogUtils.createDialog(THEME, {}); 
+        dialog.classList.remove('multitext-dialog'); 
+        dialog.classList.add('multitext-save-preset-dialog'); 
+
+        const title = document.createElement('div');
+        title.textContent = existingName ? 'Edit Template' : 'Save Template';
+        title.classList.add('multitext-save-preset-title');
+        dialog.appendChild(title);
+
+        
+        const nameInput = DialogUtils.createInput(THEME, {
+            placeholder: 'Template name',
+            value: existingName,
+            className: 'multitext-save-preset-input'
+        });
+        dialog.appendChild(nameInput);
+
+        
+        const promptTextarea = DialogUtils.createTextarea(THEME, {
+            value: promptText || '',
+            placeholder: 'Enter prompt text...',
+            className: 'multitext-dialog-textarea'
+        });
+        dialog.appendChild(promptTextarea);
+
+        
+        const categorySelect = DialogUtils.createSelect(THEME, {
+            className: 'multitext-save-preset-select',
+            options: Object.entries(THEME.promptTemplates).map(([key, cat]) => ({
+                value: key,
+                label: `${cat.icon} ${cat.label || key}`,
+                selected: existingCategory === key
+            }))
+        });
+        dialog.appendChild(categorySelect);
+
+        const buttons = document.createElement('div');
+        buttons.classList.add('multitext-save-preset-buttons');
+
+        const cancelBtn = document.createElement('button');
+        cancelBtn.textContent = 'Cancel';
+        cancelBtn.classList.add('multitext-save-preset-button', 'multitext-save-preset-button-cancel');
+        cancelBtn.onclick = () => dialog.remove();
+
+        const saveBtn = document.createElement('button');
+        saveBtn.textContent = 'Save';
+        saveBtn.classList.add('multitext-save-preset-button', 'multitext-save-preset-button-save');
+        saveBtn.onclick = async () => {
+            const name = nameInput.value.trim();
+            const category = categorySelect.value;
+            const finalPromptText = promptTextarea.value.trim();
+            
+            if (!name || !finalPromptText || !category) {
+                alert("Please fill in all fields.");
+                return;
+            }
+            try {
+                if (!THEME.promptTemplates[category].templates) {
+                    THEME.promptTemplates[category].templates = [];
+                }
+                if (existingName && existingCategory) {
+                    if (existingCategory !== category && THEME.promptTemplates[existingCategory]?.templates) {
+                        THEME.promptTemplates[existingCategory].templates = 
+                            THEME.promptTemplates[existingCategory].templates.filter(template => 
+                                template.name !== existingName
+                            );
+                    }
+                    THEME.promptTemplates[category].templates = 
+                        THEME.promptTemplates[category].templates.filter(template => 
+                            !(template.name === existingName && 
+                              (existingCategory !== category || template.name === name))
+                        );
+                } else {
+                    THEME.promptTemplates[category].templates = 
+                        THEME.promptTemplates[category].templates.filter(template => 
+                            template.name !== name
+                        );
+                }
+                THEME.promptTemplates[category].templates.push({
+                    name: name,
+                    prompt: finalPromptText,
+                    weight: promptWeight,
+                    isCustom: true
+                });
+                localStorage.setItem('multitext_templates', JSON.stringify(THEME.promptTemplates));
+                console.log(`Template \"${name}\" successfully ${existingName ? 'updated' : 'saved'} to ${category} category`);
+                dialog.remove(); 
+                if (dialogToUpdate) {
+                    setTimeout(() => {
+                        this.updateTemplateGrid(dialogToUpdate);
+                    }, 100);
+                }
+            } catch (error) {
+                console.error('Error saving template:', error);
+                alert('Failed to save template. Please try again.');
+                dialog.remove();
+            }
+        };
+
+        if (existingName && existingCategory) {
+            const deleteBtn = document.createElement('button');
+            deleteBtn.innerHTML = '✖';
+            deleteBtn.title = 'Delete template';
+            deleteBtn.classList.add('multitext-save-preset-button', 'multitext-save-preset-button-delete');
+            deleteBtn.style.backgroundColor = '#EF4444';
+            deleteBtn.style.color = 'white';
+            deleteBtn.style.borderColor = '#B91C1C';
+            deleteBtn.style.minWidth = '40px';
+            deleteBtn.style.fontSize = '16px';
+            deleteBtn.style.padding = '5px 10px';
+            deleteBtn.onclick = () => {
+                if (confirm(`Are you sure you want to delete the template \"${existingName}\"?`)) {
+                    if (THEME.promptTemplates[existingCategory]?.templates) {
+                        THEME.promptTemplates[existingCategory].templates = 
+                            THEME.promptTemplates[existingCategory].templates.filter(template => 
+                                template.name !== existingName
+                            );
+                        localStorage.setItem('multitext_templates', JSON.stringify(THEME.promptTemplates));
+                        console.log(`Template \"${existingName}\" successfully deleted from ${existingCategory} category`);
+                        if (dialogToUpdate) {
+                            this.updateTemplateGrid(dialogToUpdate);
+                        }
+                        dialog.remove();
+                    }
+                }
+            };
+            cancelBtn.style.backgroundColor = 'transparent';
+            cancelBtn.style.color = THEME.colors.text;
+            cancelBtn.style.borderColor = THEME.colors.border;
+            cancelBtn.style.borderRadius = '6px';
+            cancelBtn.style.padding = '10px 16px';
+            cancelBtn.style.fontSize = '14px';
+            cancelBtn.style.boxShadow = '0 1px 3px rgba(0,0,0,0.1)';
+            cancelBtn.style.fontWeight = '500';
+            saveBtn.style.backgroundColor = '#8B5CF6';
+            saveBtn.style.color = 'white';
+            saveBtn.style.borderColor = 'transparent';
+            saveBtn.style.borderRadius = '6px';
+            saveBtn.style.padding = '10px 16px';
+            saveBtn.style.fontSize = '14px';
+            saveBtn.style.boxShadow = '0 2px 5px rgba(0,0,0,0.2)';
+            saveBtn.style.fontWeight = '500';
+            buttons.style.display = 'flex';
+            buttons.style.gap = '12px';
+            buttons.style.paddingTop = '20px';
+            const rightButtons = document.createElement('div');
+            rightButtons.style.display = 'flex';
+            rightButtons.style.gap = '12px';
+            rightButtons.style.marginLeft = 'auto';
+            buttons.appendChild(deleteBtn);
+            rightButtons.appendChild(cancelBtn);
+            rightButtons.appendChild(saveBtn);
+            buttons.appendChild(rightButtons);
+            dialog.appendChild(buttons);
+        } else {
+            cancelBtn.style.backgroundColor = 'transparent';
+            cancelBtn.style.color = THEME.colors.text;
+            cancelBtn.style.borderColor = THEME.colors.border;
+            cancelBtn.style.borderRadius = '6px';
+            cancelBtn.style.padding = '10px 16px';
+            cancelBtn.style.fontSize = '14px';
+            cancelBtn.style.boxShadow = '0 1px 3px rgba(0,0,0,0.1)';
+            cancelBtn.style.fontWeight = '500';
+            saveBtn.style.backgroundColor = '#8B5CF6';
+            saveBtn.style.color = 'white';
+            saveBtn.style.borderColor = 'transparent';
+            saveBtn.style.borderRadius = '6px';
+            saveBtn.style.padding = '10px 16px';
+            saveBtn.style.fontSize = '14px';
+            saveBtn.style.boxShadow = '0 2px 5px rgba(0,0,0,0.2)';
+            saveBtn.style.fontWeight = '500';
+            buttons.style.display = 'flex';
+            buttons.style.justifyContent = 'flex-end';
+            buttons.style.gap = '12px';
+            buttons.style.paddingTop = '20px';
+            buttons.appendChild(cancelBtn);
+            buttons.appendChild(saveBtn);
+            dialog.appendChild(buttons);
+        }
 
         nameInput.addEventListener('keypress', (e) => {
             if (e.key === 'Enter') {
@@ -2392,65 +2030,208 @@ const MultiTextNode = {
 
         document.body.appendChild(dialog);
         nameInput.focus();
+
+        
+        dialog.style.left = `calc(50% - ${dialog.offsetWidth / 2}px)`;
+        dialog.style.top = `calc(50% - ${dialog.offsetHeight / 2}px)`;
     },
+    showSaveChoiceDialog(event, textToSave, weightToSave, mainDialog) {
+        
+        const choiceDialog = DialogUtils.createDialog(THEME, { minWidth: '200px' }); 
+        choiceDialog.className = 'multitext-save-choice-dialog'; 
 
-    createPresetItem(preset, category, menu) {
-        const item = document.createElement('div');
-        item.style.cssText = `
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            padding: 6px 12px;
-            cursor: pointer;
-            color: ${THEME.colors.text};
-            font-size: 13px;
-        `;
+        const title = document.createElement('div');
+        title.className = 'multitext-save-choice-title';
+        title.textContent = 'Save As...';
+        choiceDialog.appendChild(title);
 
-        const label = document.createElement('span');
-        label.textContent = preset.label;
-        label.style.flex = '1';
-        item.appendChild(label);
+        const buttonsDiv = document.createElement('div');
+        buttonsDiv.className = 'multitext-save-choice-buttons';
 
-        const deleteBtn = document.createElement('div');
-        deleteBtn.textContent = '✕';
-        deleteBtn.style.cssText = `
-            display: inline-block;
-            color: red;
-            font-size: 16px;
-            cursor: pointer;
-            padding: 0 8px;
-            margin-left: 8px;
-        `;
+        const savePresetBtn = document.createElement('button');
+        savePresetBtn.textContent = 'Save as Preset';
+        savePresetBtn.className = 'multitext-save-choice-button';
+        savePresetBtn.onclick = () => {
+            choiceDialog.remove();
+            
+            this.showSavePresetDialog(textToSave, weightToSave, mainDialog);
+        };
+        buttonsDiv.appendChild(savePresetBtn);
 
-        deleteBtn.onclick = (e) => {
-            e.stopPropagation();
-            if (confirm(`Are you sure you want to delete the preset "${preset.label}"?`)) {
-                const categoryPresets = THEME.promptPresets[category].presets;
-                const index = categoryPresets.findIndex(p => p.label === preset.label);
-                if (index > -1) {
-                    categoryPresets.splice(index, 1);
-                    localStorage.setItem('multitext_category_presets', JSON.stringify(THEME.promptPresets));
-                    item.remove();
+        const saveTemplateBtn = document.createElement('button');
+        saveTemplateBtn.textContent = 'Save as Template';
+        saveTemplateBtn.className = 'multitext-save-choice-button';
+        saveTemplateBtn.onclick = () => {
+            choiceDialog.remove();
+            
+            this.showSaveTemplateDialog(textToSave, weightToSave, mainDialog);
+        };
+        buttonsDiv.appendChild(saveTemplateBtn);
+
+        choiceDialog.appendChild(buttonsDiv);
+
+        document.body.appendChild(choiceDialog);
+        const rect = event.target.getBoundingClientRect();
+        const choiceRect = choiceDialog.getBoundingClientRect();
+        let top = rect.bottom + 5;
+        let left = rect.left + (rect.width / 2) - (choiceRect.width / 2);
+        if (left < 5) left = 5;
+        if (left + choiceRect.width > window.innerWidth - 5) {
+            left = window.innerWidth - choiceRect.width - 5;
+        }
+        if (top + choiceRect.height > window.innerHeight - 5) {
+            top = rect.top - choiceRect.height - 5;
+        }
+        choiceDialog.style.left = `${left}px`;
+        choiceDialog.style.top = `${top}px`;
+
+        const closeListener = (e) => {
+            if (!choiceDialog.contains(e.target) && e.target !== event.target) {
+                choiceDialog.remove();
+                document.removeEventListener('mousedown', closeListener, true);
+            }
+        };
+        document.addEventListener('mousedown', closeListener, true);
+    },
+    updateTemplateGrid(dialog) {
+        const templateGrid = dialog.querySelector('.multitext-dialog-template-grid');
+        if (!templateGrid) return;
+
+        
+        templateGrid.innerHTML = '';
+
+        
+        Object.entries(THEME.promptTemplates).forEach(([category, { icon, label, templates }]) => {
+            if (!Array.isArray(templates)) {
+                console.warn(`Templates for category '${category}' is not an array. Skipping.`);
+                return;
+            }
+            templates.forEach(template => {
+                const templateBtn = document.createElement('button');
+                templateBtn.classList.add('multitext-dialog-template-button');
+
+                const templateBtnHeader = document.createElement('div');
+                templateBtnHeader.classList.add('multitext-dialog-template-button-header');
+                templateBtnHeader.innerHTML = `${icon || '📝'} ${template.name}`;
+
+                const templateInfo = document.createElement('div');
+                templateInfo.classList.add('multitext-dialog-template-button-info');
+                templateInfo.innerHTML = `
+                    <span>${label || category}</span>
+                    <span>${template.weight ? template.weight.toFixed(1) : '-'}</span>
+                `;
+
+                
+                const editIcon = document.createElement('div');
+                editIcon.classList.add('multitext-template-edit-icon');
+                editIcon.innerHTML = '⋮';
+                editIcon.title = 'Edit template';
+
+                
+                editIcon.onclick = (e) => {
+                    e.stopPropagation();
+                    this.showSaveTemplateDialog(
+                        template.prompt,
+                        template.weight,
+                        dialog,
+                        template.name,
+                        category
+                    );
+                };
+
+                templateBtn.appendChild(editIcon);
+                templateBtn.appendChild(templateBtnHeader);
+                templateBtn.appendChild(templateInfo);
+
+                templateBtn.onclick = () => {
+                    const textarea = dialog.textarea;
+                    const weightInput = dialog.weightInput;
+                    if (textarea) {
+                        textarea.value = template.prompt;
+                        if (template.weight !== undefined && weightInput) {
+                        weightInput.value = template.weight;
+                        }
+                        textarea.dispatchEvent(new Event('input'));
+                    }
+                };
+
+                templateGrid.appendChild(templateBtn);
+            });
+        });
+    },
+    updateHistoryDropdown(dropdown) {
+        if (!dropdown) return;
+        
+        
+        dropdown.innerHTML = '';
+        
+        
+        const history = this.loadPromptHistory();
+        
+        if (history.length === 0) {
+            const emptyMessage = document.createElement('div');
+            emptyMessage.classList.add('multitext-dialog-history-empty');
+            emptyMessage.textContent = 'No history items';
+            dropdown.appendChild(emptyMessage);
+            return;
+        }
+        
+        
+        history.forEach((item, index) => {
+            const historyItem = document.createElement('div');
+            historyItem.classList.add('multitext-dialog-history-item');
+            
+            const textSpan = document.createElement('span');
+            textSpan.classList.add('multitext-dialog-history-text');
+            textSpan.textContent = item.text;
+            historyItem.appendChild(textSpan);
+            
+            const deleteBtn = document.createElement('button');
+            deleteBtn.classList.add('multitext-dialog-history-delete');
+            deleteBtn.innerHTML = '✕';
+            deleteBtn.onclick = (e) => {
+                e.stopPropagation();
+                
+                history.splice(index, 1);
+                
+                localStorage.setItem('multitext_history', JSON.stringify(history));
+                
+                historyItem.remove();
+                
+                if (history.length === 0) {
+                    const emptyMessage = document.createElement('div');
+                    emptyMessage.classList.add('multitext-dialog-history-empty');
+                    emptyMessage.textContent = 'No history items';
+                    dropdown.appendChild(emptyMessage);
                 }
-            }
-        };
-
-        item.onclick = () => {
-            const textWidget = this.widgets.find(w => w.name === 'text1');
-            if (textWidget) {
-                textWidget.value = preset.value;
-                textWidget.callback?.(preset.value);
-            }
-            menu.remove();
-        };
-
-        item.appendChild(deleteBtn);
-        return item;
+                
+                this.updateHistoryDropdown(dropdown);
+            };
+            historyItem.appendChild(deleteBtn);
+            
+            historyItem.onclick = () => {
+                const textarea = dropdown.closest('.multitext-dialog')?.querySelector('.multitext-dialog-textarea');
+                if (textarea) {
+                    textarea.value = item.text;
+                    textarea.dispatchEvent(new Event('input'));
+                }
+                dropdown.style.display = 'none';
+            };
+            
+            historyItem.onmouseover = () => {
+                deleteBtn.style.display = 'block';
+            };
+            
+            historyItem.onmouseout = () => {
+                deleteBtn.style.display = 'none';
+            };
+            
+            dropdown.appendChild(historyItem);
+        });
     },
-
+    
     loadFonts() {
         if (document.getElementById('multitext-fonts')) return;
-
         const head = document.head;
         const fontElements = `
             <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap">
@@ -2463,243 +2244,224 @@ const MultiTextNode = {
         `;
         head.insertAdjacentHTML('beforeend', fontElements);
     },
+    
+    _makeDialogDraggable(dialogElement, headerElement) {
+        let isDragging = false;
+        let xOffset = 0;
+        let yOffset = 0;
 
-    drawNodeContents(ctx) {
-        const margin = THEME.sizes.margin;
-        let y = margin;
+        const removeListeners = () => {
+            document.removeEventListener('mousemove', dragMove);
+            document.removeEventListener('mouseup', dragEnd);
+            if (headerElement) headerElement.style.cursor = 'move'; 
+        };
 
-        for (let i = 0; i < this.activePrompts; i++) {
-            const textWidget = this.widgets.find(w => w.name === `text${i + 1}`);
-            const weightWidget = this.widgets.find(w => w.name === `weight${i + 1}`);
+        const dragStart = (e) => {
             
-            if (textWidget && weightWidget) {
-                if (i === this.currentHoverIndex) {
-                    ctx.fillStyle = THEME.colors.bgHover;
-                } else {
-                    ctx.fillStyle = THEME.colors.bg;
-                }
-                
-                Utils.drawRoundedRect(
-                    ctx, 
-                    margin, 
-                    y, 
-                    this.size[0] - margin * 2, 
-                    STYLES.row.height,
-                    THEME.sizes.borderRadius
-                );
-
-                ctx.fillStyle = THEME.colors.text;
-                ctx.font = `13px ${THEME.typography.fonts.primary}`;
-                ctx.textBaseline = 'middle';
-                const text = textWidget.value || `Prompt ${i + 1}`;
-                const truncatedText = Utils.truncateTextEfficient(
-                    ctx, 
-                    text, 
-                    this.size[0] - margin * 4 - STYLES.weight.width
-                );
-                ctx.fillText(truncatedText, margin + 12, y + STYLES.row.height/2);
-
-                this.drawWeight(
-                    ctx,
-                    weightWidget.value,
-                    this.size[0] - margin - STYLES.weight.width,
-                    y + STYLES.row.height/2 - 8
-                );
-
-                y += STYLES.row.height + STYLES.row.margin;
+            
+            if (headerElement && (e.target === headerElement || headerElement.contains(e.target)) && !e.target.closest('button')) {
+                isDragging = true;
+                dialogElement.style.transition = 'none'; 
+                headerElement.style.cursor = 'grabbing';
+                const rect = dialogElement.getBoundingClientRect();
+                xOffset = e.clientX - rect.left;
+                yOffset = e.clientY - rect.top;
+                e.preventDefault(); 
+                document.addEventListener('mousemove', dragMove);
+                document.addEventListener('mouseup', dragEnd);
             }
+        };
+
+        const dragMove = (e) => {
+            if (isDragging) {
+                e.preventDefault();
+                const x = e.clientX - xOffset;
+                const y = e.clientY - yOffset;
+                dialogElement.style.left = `${x}px`;
+                dialogElement.style.top = `${y}px`;
+                dialogElement.style.transform = 'none'; 
+            }
+        };
+
+        const dragEnd = (e) => {
+            if (isDragging) {
+                isDragging = false;
+                removeListeners(); 
+                 
+                
+            }
+        };
+        
+        if (headerElement) {
+           headerElement.style.cursor = 'move'; 
+           headerElement.addEventListener('mousedown', dragStart);
+        } else {
+            console.warn("Draggable dialog called without a valid header element.");
         }
 
-        this.drawControlButtons(ctx);
+        
+        
+        
+        
+        return () => {
+            if (headerElement) {
+               headerElement.removeEventListener('mousedown', dragStart);
+            }
+            removeListeners(); 
+        };
     },
+    
+    _showDeletePresetDialog(preset) {
+        if (!preset) return;
+        if (confirm(`Are you sure you want to delete the preset \"${preset.label}\"?`)) {
+            let categoryFound = null;
+            let presetIndex = -1;
 
-    createHistoryItem(item, textarea, historyDropdown) {
-        const container = document.createElement('div');
-        container.style.cssText = `
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            padding: 4px 8px;
-            border-radius: 4px;
-            cursor: pointer;
-            &:hover {
-                background: ${THEME.colors.bgHover};
+            
+            for (const category in THEME.promptPresets) {
+                if (THEME.promptPresets[category]?.presets) {
+                    presetIndex = THEME.promptPresets[category].presets.findIndex(p => p.label === preset.label && p.value === preset.value);
+                    if (presetIndex > -1) {
+                        categoryFound = category;
+                        break;
+                    }
+                }
             }
-        `;
 
-        const text = document.createElement('div');
-        text.textContent = item.text.substring(0, 40) + (item.text.length > 40 ? '...' : '');
-        text.style.flex = 1;
-
-        const date = document.createElement('div');
-        date.textContent = formatDate(item.timestamp);
-        date.style.cssText = `
-            font-size: 11px;
-            color: ${THEME.colors.textDim};
-        `;
-
-        const deleteBtn = document.createElement('button');
-        deleteBtn.textContent = '🗑️';
-        deleteBtn.title = 'Delete from history';
-        deleteBtn.style.cssText = `
-            background: none;
-            border: none;
-            color: ${THEME.colors.textDim};
-            font-size: 12px;
-            padding: 4px;
-            cursor: pointer;
-            opacity: 0.6;
-            transition: all 0.2s;
-            display: none;
-
-            &:hover {
-                opacity: 1;
-                color: ${THEME.colors.error || '#ff4444'};
+            if (categoryFound !== null && presetIndex > -1) {
+                THEME.promptPresets[categoryFound].presets.splice(presetIndex, 1);
+                localStorage.setItem('multitext_category_presets', JSON.stringify(THEME.promptPresets));
+                console.log(`Preset \"${preset.label}\" successfully deleted from ${categoryFound} category`);
+                
+                
+                
+            } else {
+                console.warn("Could not find preset to delete in THEME structure:", preset);
             }
-        `;
+        }
+    },
+    
 
-        container.onmouseenter = () => {
-            deleteBtn.style.display = 'block';
-        };
-        container.onmouseleave = () => {
-            deleteBtn.style.display = 'none';
-        };
+    
+    _showEditPresetDialog(preset, labelElementToUpdate = null) {
+        if (!preset) return;
 
-        deleteBtn.onclick = (e) => {
-            e.stopPropagation();
-            const history = JSON.parse(localStorage.getItem('multitext_history') || '[]');
-            const updatedHistory = history.filter(h => h.text !== item.text);
-            localStorage.setItem('multitext_history', JSON.stringify(updatedHistory));
-            container.remove();
+        const editDialog = DialogUtils.createDialog(THEME, {
+            className: 'multitext-save-preset-dialog',
+        });
+        editDialog.style.zIndex = '10002'; 
 
-            if (updatedHistory.length === 0) {
-                historyDropdown.innerHTML = `
-                    <div style="padding: 8px 12px; color: ${THEME.colors.textDim}; text-align: center;">
-                        History is empty
-                    </div>
-                `;
+        const editHeader = DialogUtils.createHeader(THEME, 'Edit Preset', [
+            DialogUtils.createButton(THEME, {
+                innerHTML: '✕',
+                className: 'multitext-dialog-button-close',
+                onclick: () => editDialog.remove()
+            })
+        ]);
+        editDialog.appendChild(editHeader); 
+        const cleanupDragEdit = this._makeDialogDraggable(editDialog, editHeader); 
+
+        const nameInput = DialogUtils.createInput(THEME, {
+            value: preset.label,
+            placeholder: 'Preset name',
+            className: 'multitext-save-preset-input' 
+        });
+        editDialog.appendChild(nameInput);
+         const valueInput = DialogUtils.createTextarea(THEME, {
+            value: preset.value,
+            placeholder: 'Preset value',
+            className: 'multitext-dialog-textarea' 
+        });
+        editDialog.appendChild(valueInput);
+         const buttons = document.createElement('div');
+        buttons.classList.add('multitext-save-preset-buttons');
+        const cancelBtn = DialogUtils.createButton(THEME, {
+            innerHTML: 'Cancel',
+            className: 'multitext-save-preset-button multitext-save-preset-button-cancel',
+            onclick: (e) => {
+                e.stopPropagation();
+                editDialog.remove();
             }
-        };
+        });
+        const saveBtn = DialogUtils.createButton(THEME, {
+            innerHTML: 'Save',
+            className: 'multitext-save-preset-button multitext-save-preset-button-save',
+            onclick: (e) => {
+                e.stopPropagation();
+                const newName = nameInput.value.trim();
+                const newValue = valueInput.value.trim();
+                if (newName && newValue) {
+                    
+                    let originalCategory = null;
+                    for (const cat in THEME.promptPresets) {
+                        if (THEME.promptPresets[cat]?.presets?.some(p => p.label === preset.label && p.value === preset.value)) {
+                            originalCategory = cat;
+                            break;
+                        }
+                    }
 
-        text.onclick = () => {
-            textarea.value = item.text;
-            textarea.dispatchEvent(new Event('input'));
-            historyDropdown.style.display = 'none';
-        };
-
-        container.appendChild(text);
-        container.appendChild(date);
-        container.appendChild(deleteBtn);
-
-        return container;
-    }
-};
-
-const createWeightControls = (weightInput) => {
-    const container = document.createElement('div');
-    container.style.cssText = `
-        display: flex;
-        align-items: center;
-        gap: 4px;
-    `;
-
-    const decreaseBtn = document.createElement('button');
-    decreaseBtn.textContent = '-';
-    const increaseBtn = document.createElement('button');
-    [decreaseBtn, increaseBtn].forEach(btn => {
-        btn.style.cssText = `
-            width: 20px;
-            height: 20px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            background: ${THEME.colors.bgActive};
-            border: 1px solid ${THEME.colors.border};
-            border-radius: 4px;
-            color: ${THEME.colors.text};
-            cursor: pointer;
-            user-select: none;
-            &:hover {
-                background: ${THEME.colors.bgHover};
+                    if (originalCategory) {
+                        const presetIndex = THEME.promptPresets[originalCategory].presets.findIndex(p => p.label === preset.label && p.value === preset.value);
+                        if (presetIndex > -1) {
+                            THEME.promptPresets[originalCategory].presets[presetIndex].label = newName;
+                            THEME.promptPresets[originalCategory].presets[presetIndex].value = newValue;
+                            
+                            preset.label = newName; 
+                            preset.value = newValue;
+                            
+                            
+                            if (labelElementToUpdate) {
+                                labelElementToUpdate.textContent = newName;
+                            }
+                            this.saveToHistory(newValue); 
+                            localStorage.setItem('multitext_category_presets', JSON.stringify(THEME.promptPresets));
+                        }
+                    } else {
+                         console.warn("Could not find original category for preset:", preset);
+                    }
+                    editDialog.remove();
+                }
             }
-        `;
-    });
+        });
+        buttons.appendChild(cancelBtn);
+        buttons.appendChild(saveBtn);
+        editDialog.appendChild(buttons);
+         editDialog.addEventListener('mousedown', (e) => {
+            e.stopPropagation(); 
+        });
+         document.body.appendChild(editDialog);
+        nameInput.focus();
+        nameInput.select();
 
-    decreaseBtn.onclick = () => {
-        const newValue = Math.max(0, parseFloat(weightInput.value) - 0.1);
-        weightInput.value = newValue.toFixed(1);
-    };
-
-    increaseBtn.onclick = () => {
-        const newValue = Math.min(2, parseFloat(weightInput.value) + 0.1);
-        weightInput.value = newValue.toFixed(1);
-    };
-
-    container.appendChild(decreaseBtn);
-    container.appendChild(weightInput);
-    container.appendChild(increaseBtn);
-
-    return container;
-};
-
-const setupTextarea = (textarea) => {
-    const container = document.createElement('div');
-    container.style.cssText = `
-        position: relative;
-        width: 100%;
-        margin-bottom: ${THEME.sizes.spacing.md}px;
-    `;
-
-    const counter = document.createElement('div');
-    counter.style.cssText = `
-        position: absolute;
-        bottom: -18px;
-        right: 0;
-        font-size: 11px;
-        color: ${THEME.colors.textDim};
-    `;
-
-    const updateCounter = () => {
-        const count = textarea.value.length;
-        counter.textContent = `${count} characters`;
-        counter.style.color = count > 500 ? THEME.colors.warning : THEME.colors.textDim;
-    };
-
-    textarea.addEventListener('input', () => {
-        updateCounter();
-        textarea.style.height = 'auto';
-        textarea.style.height = Math.min(300, textarea.scrollHeight) + 'px';
-    });
-
-    container.appendChild(textarea);
-    container.appendChild(counter);
-    updateCounter();
-
-    return container;
-};
-
-const formatDate = (timestamp) => {
-    const date = new Date(timestamp);
-    const now = new Date();
-    const diff = now - date;
-
-    if (diff < 60000) return 'Just now';
-    if (diff < 3600000) return `${Math.floor(diff/60000)} min ago`;
-    if (diff < 86400000) return `${Math.floor(diff/3600000)} hr ago`;
-    return date.toLocaleDateString('en-US');
+        requestAnimationFrame(() => { 
+            const container = document.querySelector('.graph-canvas-container') || document.body;
+            const containerRect = container.getBoundingClientRect();
+            const dialogRect = editDialog.getBoundingClientRect();
+            let desiredLeft = (containerRect.width - dialogRect.width) / 2 + containerRect.left;
+            let desiredTop = (containerRect.height - dialogRect.height) / 2 + containerRect.top;
+            
+            const clampedLeft = Math.max(
+                containerRect.left + 10, 
+                Math.min(containerRect.right - dialogRect.width - 10, desiredLeft)
+            );
+            const clampedTop = Math.max(
+                containerRect.top + 10, 
+                Math.min(containerRect.bottom - dialogRect.height - 10, desiredTop)
+            );
+            editDialog.style.left = clampedLeft + 'px';
+            editDialog.style.top = clampedTop + 'px';
+            editDialog.style.transform = 'none'; 
+        });
+    },
 };
 
 app.registerExtension({
     name: "SKB.MultiText",
     async beforeRegisterNodeDef(nodeType, nodeData, app) {
         if (nodeData.name !== "MultiTextNode") return;
-        
         Object.assign(nodeType.prototype, MultiTextNode);
-        
-        nodeType.prototype.loadFonts();
     }
 });
-
 app.ui.settings.addSetting({
     id: "SKB.ShowTooltips",
     name: "Show Multi-Text tooltips on hover?",

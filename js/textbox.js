@@ -1,211 +1,12 @@
-import { app } from "../../scripts/app.js";
-import { ComfyWidgets } from "../../scripts/widgets.js";
-import { SVG, STYLES } from "./TextBoxConstants.js";
-
-function drawToolbarButton(ctx, x, y, width, height, svgString, node, isActive = false, isHovered = false, tooltip = "") {
-    const bgColor = isActive ? '#4a4a4a' : isHovered ? '#3a3a3a' : '#2a2a2a';
-    
-    ctx.beginPath();
-    ctx.roundRect(x, y, width, height, 3);
-    ctx.fillStyle = bgColor;
-    ctx.fill();
-
-    if (isActive || isHovered) {
-        ctx.shadowColor = "rgba(80, 100, 255, 0.2)";
-        ctx.shadowBlur = 4;
-        ctx.strokeStyle = "rgba(80, 100, 255, 0.3)";
-        ctx.lineWidth = 1;
-        ctx.stroke();
-        ctx.shadowColor = "transparent";
-        ctx.shadowBlur = 0;
-    }
-
-    const padding = 4;
-    const iconSize = 14;
-    const iconX = x + (width - iconSize) / 2;
-    const iconY = y + (height - iconSize) / 2;
-
-    try {
-        const img = new Image();
-        img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svgString);
-
-        if (img.complete) {
-            ctx.drawImage(img, iconX, iconY, iconSize, iconSize);
-        } else {
-            img.onload = () => {
-                ctx.drawImage(img, iconX, iconY, iconSize, iconSize);
-                if (node) node.setDirtyCanvas(true);
-            };
-        }
-    } catch (error) {
-        console.error('SVG çizim hatası:', error);
-    }
-
-    if (isHovered && tooltip) {
-        const tooltipPadding = 4;
-        const tooltipHeight = 16;
-        
-        ctx.font = "10px Inter, Arial";
-        const tooltipWidth = ctx.measureText(tooltip).width + (tooltipPadding * 2);
-        
-        const tooltipX = x + (width - tooltipWidth) / 2;
-        const tooltipY = y + height + 4;
-        
-        ctx.fillStyle = "rgba(0, 0, 0, 0.8)";
-        ctx.beginPath();
-        ctx.roundRect(tooltipX, tooltipY, tooltipWidth, tooltipHeight, 2);
-        ctx.fill();
-        
-        ctx.fillStyle = "#ffffff";
-        ctx.textAlign = "center";
-        ctx.textBaseline = "middle";
-        ctx.fillText(tooltip, tooltipX + tooltipWidth/2, tooltipY + tooltipHeight/2);
-    }
-}
-
-const textMetricsCache = new Map();
-let tempCanvas = null;
-let tempCtx = null;
-
-function getTextMetrics(text, font) {
-    const cacheKey = `${text}_${font}`;
-    if (textMetricsCache.has(cacheKey)) {
-        return textMetricsCache.get(cacheKey);
-    }
-
-    if (!tempCanvas) {
-        tempCanvas = document.createElement('canvas');
-        tempCtx = tempCanvas.getContext('2d');
-    }
-
-    tempCtx.font = font;
-    const metrics = tempCtx.measureText(text);
-    textMetricsCache.set(cacheKey, metrics);
-    return metrics;
-}
-
-function drawHorizontalSlider(ctx, x, y, width, value, min, max, label) {
-    const height = 48;
-    const trackHeight = 4;
-    const handleSize = 12;
-    const labelSize = 12;
-    const valueSize = labelSize;
-    
-    ctx.fillStyle = "rgba(0,0,0,0.3)";
-    ctx.beginPath();
-    ctx.roundRect(x, y, width, 24, 4);
-    ctx.fill();
-    
-    ctx.fillStyle = "#bbb";
-    ctx.font = `${labelSize}px Inter, Arial`;
-    ctx.textAlign = "left";
-    ctx.fillText(label, x + 4, y + 16);
-
-    ctx.textAlign = "right";
-    ctx.fillStyle = "#4a9eff";
-    ctx.font = `${valueSize}px Inter, Arial`;
-    ctx.fillText(Math.round(value), x + width - 4, y + 16);
-    
-    const trackY = y + 32;
-    ctx.beginPath();
-    ctx.fillStyle = "rgba(255,255,255,0.1)";
-    ctx.roundRect(x, trackY - trackHeight/2, width, trackHeight, 3);
-    ctx.fill();
-    
-    const progress = (value - min) / (max - min);
-    const gradient = ctx.createLinearGradient(x, trackY, x + width * progress, trackY);
-    gradient.addColorStop(0, "#4a9eff");
-    gradient.addColorStop(1, "#0066cc");
-    ctx.fillStyle = gradient;
-    ctx.beginPath();
-    ctx.roundRect(x, trackY - trackHeight/2, width * progress, trackHeight, 3);
-    ctx.fill();
-    
-    const handleX = x + (width * progress);
-    const handleY = trackY;
-    
-    if (this?.uiState?.hoveredSlider === label || this?.isDraggingSlider === "x") {
-        ctx.beginPath();
-        ctx.strokeStyle = "rgba(74, 158, 255, 0.2)";
-        ctx.lineWidth = handleSize + 8;
-        ctx.arc(handleX, handleY, handleSize/4, 0, Math.PI * 2);
-        ctx.stroke();
-    }
-    
-    ctx.beginPath();
-    ctx.fillStyle = "#fff";
-    ctx.arc(handleX, handleY, handleSize/2, 0, Math.PI * 2);
-    ctx.fill();
-    
-    ctx.beginPath();
-    ctx.strokeStyle = "#4a9eff";
-    ctx.lineWidth = 2;
-    ctx.arc(handleX, handleY, handleSize/2, 0, Math.PI * 2);
-    ctx.stroke();
-}
-
-function drawVerticalSlider(ctx, x, y, height, value, min, max, label) {
-    const width = 24;
-    const trackWidth = 4;
-    const handleSize = 12;
-    const labelSize = 12;
-    
-    ctx.fillStyle = "rgba(0,0,0,0.3)";
-    ctx.beginPath();
-    ctx.roundRect(x, y - 24, width, 20, 4);
-    ctx.fill();
-    
-    ctx.save();
-    ctx.fillStyle = "#bbb";
-    ctx.font = `${labelSize}px Inter, Arial`;
-    ctx.textAlign = "center";
-    ctx.fillText(label, x + width/2, y - 8);
-    ctx.restore();
-    
-    const trackX = x + width/2;
-    ctx.beginPath();
-    ctx.fillStyle = "rgba(255,255,255,0.1)";
-    ctx.roundRect(trackX - trackWidth/2, y, trackWidth, height, 3);
-    ctx.fill();
-    
-    const progress = (value - min) / (max - min);
-    const progressHeight = height * (1 - progress);
-    const gradient = ctx.createLinearGradient(trackX, y + height, trackX, y + progressHeight);
-    gradient.addColorStop(0, "#4a9eff");
-    gradient.addColorStop(1, "#0066cc");
-    ctx.fillStyle = gradient;
-    ctx.beginPath();
-    ctx.roundRect(trackX - trackWidth/2, y + progressHeight, trackWidth, height - progressHeight, 3);
-    ctx.fill();
-    
-    const handleX = trackX;
-    const handleY = y + progressHeight;
-    
-    if (this?.uiState?.hoveredSlider === label || this?.isDraggingSlider === "y") {
-        ctx.beginPath();
-        ctx.strokeStyle = "rgba(74, 158, 255, 0.2)";
-        ctx.lineWidth = handleSize + 8;
-        ctx.arc(handleX, handleY, handleSize/4, 0, Math.PI * 2);
-        ctx.stroke();
-    }
-    
-    ctx.beginPath();
-    ctx.fillStyle = "#fff";
-    ctx.arc(handleX, handleY, handleSize/2, 0, Math.PI * 2);
-    ctx.fill();
-    
-    ctx.beginPath();
-    ctx.strokeStyle = "#4a9eff";
-    ctx.lineWidth = 2;
-    ctx.arc(handleX, handleY, handleSize/2, 0, Math.PI * 2);
-    ctx.stroke();
-}
+import { app } from "../../../scripts/app.js";
+import { ComfyWidgets } from "../../../scripts/widgets.js";
+import { SVG, STYLES, WIDGET_CONFIG, TOOLBAR_TOOLS } from "./TextBoxConstants.js";
 
 app.registerExtension({
     name: "SKB.TextBox",
     async beforeRegisterNodeDef(nodeType, nodeData, app) {
         if (nodeType.comfyClass === "TextBox") {
-            // Sadece bir kere style ekle
+
             if (!document.getElementById('skb-textbox-styles')) {
                 const style = document.createElement('style');
                 style.id = 'skb-textbox-styles';
@@ -213,60 +14,90 @@ app.registerExtension({
                 document.head.appendChild(style);
             }
 
+
             Object.assign(nodeType.prototype, {
                 onNodeCreated() {
-                    const buttonSize = 20;
-                    const buttonPadding = 3;
-                    const buttonSpacing = 2;
+
+                this.size = [320, 200];
+
+                this.widgets_by_name = {};
+                for (const [name, [type, options]] of Object.entries(WIDGET_CONFIG)) {
+                    const widget = ComfyWidgets[type](this, name, [type, options], app);
+                    this.widgets_by_name[name] = widget.widget;
+
                     
-                    const lastButtonX = 350;
-                    
-                    const minWidth = lastButtonX + buttonSize + 8;
-
-                    this.size = [Math.max(400, minWidth), 300];
-
-                    const config = {
-                        text: ["STRING", { multiline: true, default: "", hidden: true }],
-                        font_size: ["INT", { default: 32, min: 8, max: 128, hidden: true }],
-                        text_color: ["STRING", { default: "#FFFFFF", hidden: true }],
-                        text_gradient_start: ["STRING", { default: "", hidden: true }],
-                        text_gradient_end: ["STRING", { default: "", hidden: true }],
-                        text_gradient_angle: ["INT", { default: 0, min: 0, max: 360, hidden: true }],
-                        background_color: ["STRING", { default: "#000000", hidden: true }],
-                        width: ["INT", { default: 512, min: 64, max: 2048, hidden: true }],
-                        height: ["INT", { default: 512, min: 64, max: 2048, hidden: true }],
-                        position_x: ["FLOAT", { default: 256, min: 0, max: 512, step: 1, precision: 0, label: "X Position", hidden: true }],
-                        position_y: ["FLOAT", { default: 256, min: 0, max: 512, step: 1, precision: 0, label: "Y Position", hidden: true }],
-                        rotation: ["FLOAT", { default: 0.0, min: -360.0, max: 360.0, hidden: true }],
-                        is_bold: ["BOOLEAN", { default: false, hidden: true }],
-                        is_italic: ["BOOLEAN", { default: false, hidden: true }],
-                        text_align: ["STRING", { default: "center", hidden: true }],
-                        font_family: ["STRING", { default: "Arial", hidden: true }],
-                        text_shadow: ["BOOLEAN", { default: false, hidden: true }],
-                        text_outline: ["BOOLEAN", { default: false, hidden: true }],
-                        outline_color: ["STRING", { default: "#000000", hidden: true }],
-                        outline_width: ["INT", { default: 3, min: 1, max: 20, hidden: true }],
-                        opacity: ["FLOAT", { default: 1.0, min: 0.0, max: 1.0, hidden: true }],
-                        background_visible: ["BOOLEAN", { default: true, hidden: true }],
-                        reflect_x: ["BOOLEAN", { default: false, hidden: true }],
-                        reflect_y: ["BOOLEAN", { default: false, hidden: true }],
-                        canvas_image: ["STRING", { default: "", hidden: true }]
-                    };
-
-                    this.widgets_by_name = {};
-                    for (const [name, [type, options]] of Object.entries(config)) {
-                        const widget = ComfyWidgets[type](this, name, [type, options], app);
-                        this.widgets_by_name[name] = widget.widget;
-                        if (options.hidden) {
-                            widget.widget.type = "hidden";
-                        }
+                    if (widget.widget) {
+                        widget.widget.origType = widget.widget.type;
+                        widget.widget.type = "hidden";
+                        widget.widget.origComputeSize = widget.widget.computeSize;
+                        widget.widget.computeSize = () => [0, -4];
+                        const origDraw = widget.widget.draw;
+                        widget.widget.draw = function(ctx, node, width, y) {
+                            
+                            this.type = this.origType;
+                            const size = this.origComputeSize ? this.origComputeSize() : [0, 0];
+                            this.type = "hidden";
+                            return size;
+                        };
                     }
+                }
+
+                if (this.widgets) {
+                    for (const widget of this.widgets) {
+                        widget.origType = widget.type;
+                        widget.type = "hidden";
+                        widget.origComputeSize = widget.computeSize;
+                        widget.computeSize = () => [0, -4];
+                        const origDraw = widget.draw;
+                        widget.draw = function(ctx, node, width, y) {
+                            
+                            this.type = this.origType;
+                            const size = this.origComputeSize ? this.origComputeSize() : [0, 0];
+                            this.type = "hidden";
+                            return size;
+                        };
+                    }
+                }
+
+                this.widgets_height = 0;
+
+
+
+                this.min_height = 20;
+                this.max_height = 20;
+
+
+
+
+
+
+                    const defaultPositionX = 256;
+                    const defaultPositionY = 256;
+                    const defaultWidth = 512;
+                    const defaultHeight = 512;
+
+
+                    const positionX = this.widgets_by_name.position_x &&
+                                     typeof this.widgets_by_name.position_x.value !== 'undefined' ?
+                                     this.widgets_by_name.position_x.value : defaultPositionX;
+
+                    const positionY = this.widgets_by_name.position_y &&
+                                     typeof this.widgets_by_name.position_y.value !== 'undefined' ?
+                                     this.widgets_by_name.position_y.value : defaultPositionY;
+
+                    const canvasWidth = this.widgets_by_name.width &&
+                                     typeof this.widgets_by_name.width.value !== 'undefined' ?
+                                     this.widgets_by_name.width.value : defaultWidth;
+
+                    const canvasHeight = this.widgets_by_name.height &&
+                                      typeof this.widgets_by_name.height.value !== 'undefined' ?
+                                      this.widgets_by_name.height.value : defaultHeight;
 
                     this.uiState = {
                         text: "Enter Text",
-                        position: { 
-                            x: this.widgets_by_name.position_x.value,
-                            y: this.widgets_by_name.position_y.value
+                        position: {
+                            x: positionX,
+                            y: positionY
                         },
                         rotation: 0,
                         scale: { x: 1, y: 1 },
@@ -281,48 +112,19 @@ app.registerExtension({
                         textColor: "#FFFFFF",
                         backgroundColor: "#000000",
                         backgroundVisible: true,
-                        canvasWidth: 512,
-                        canvasHeight: 512,
+                        canvasWidth: canvasWidth,
+                        canvasHeight: canvasHeight,
                         fontFamily: "Arial",
-                        fontStyle: "normal",
                         textShadow: false,
                         textOutline: false,
                         outlineColor: "#000000",
                         outlineWidth: 3,
-                        borderRadius: 0,
                         reflectX: false,
-                        reflectY: false,
-                        isCompact: false
+                        reflectY: false
                     };
 
-                    this.updateWidgets = () => {
-                        if (this.widgets_by_name.text) {
-                            Object.entries({
-                                text: this.uiState.text,
-                                position_x: Math.round(this.uiState.position.x),
-                                position_y: Math.round(this.uiState.position.y),
-                                rotation: this.uiState.rotation,
-                                is_bold: this.uiState.bold,
-                                is_italic: this.uiState.italic,
-                                text_align: this.uiState.align,
-                                font_size: this.uiState.fontSize,
-                                text_color: this.uiState.textColor,
-                                background_color: this.uiState.backgroundColor,
-                                text_outline: this.uiState.textOutline,
-                                outline_color: this.uiState.outlineColor,
-                                outline_width: this.uiState.outlineWidth,
-                                reflect_x: this.uiState.reflectX,
-                                reflect_y: this.uiState.reflectY
-                            }).forEach(([key, value]) => {
-                                if (this.widgets_by_name[key]) {
-                                    this.widgets_by_name[key].value = value;
-                                }
-                            });
-                            this.serialize_widgets();
-                        }
-                    };
 
-                    this.openOutlineDialog = () => {
+                    this._createDialog = (title, contentHTML, onSetup, onOk) => {
                         const dialog = document.createElement("div");
                         dialog.style.cssText = `
                             position: fixed;
@@ -335,301 +137,196 @@ app.registerExtension({
                             border-radius: 4px;
                             z-index: 10000;
                             min-width: 300px;
+                            box-shadow: 0 5px 15px rgba(0,0,0,0.5);
                         `;
-
-                        const currentColor = this.uiState.outlineColor || "#000000";
-                        const currentWidth = this.uiState.outlineWidth || 3;
 
                         dialog.innerHTML = `
                             <div style="margin-bottom: 20px;">
-                                <h3 style="color: #fff; margin: 0 0 15px 0; font-size: 16px;">Outline Settings</h3>
-                                
-                                <div style="margin-bottom: 15px;">
-                                    <label style="color: #ccc; display: block; margin-bottom: 5px;">Outline Color:</label>
-                                    <div style="display: flex; align-items: center; gap: 10px;">
-                                        <input type="color" id="outlineColor" value="${currentColor}"
-                                               style="width: 50px; height: 30px; padding: 0; border: none; background: none;">
-                                        <input type="text" id="outlineColorText" value="${currentColor}"
-                                               style="width: 80px; background: #2a2a2a; color: #fff; border: 1px solid #666; padding: 4px; border-radius: 3px;">
-                                    </div>
-                                </div>
-
-                                <div style="margin-bottom: 15px;">
-                                    <label style="color: #ccc; display: block; margin-bottom: 5px;">Outline Width:</label>
-                                    <input type="range" id="outlineWidth" value="${currentWidth}" min="1" max="10" step="1"
-                                           style="width: 100%; background: #2a2a2a;">
-                                    <span id="outlineWidthValue" style="color: #fff; margin-left: 10px;">${currentWidth}px</span>
-                                </div>
-
-                                <div style="margin-bottom: 15px;">
-                                    <label style="display: flex; align-items: center; gap: 8px; color: #ccc; cursor: pointer;">
-                                        <input type="checkbox" id="outlineEnabled" ${this.uiState.textOutline ? 'checked' : ''}>
-                                        <span>Enable Outline</span>
-                                    </label>
-                                </div>
-
-                                <div style="display: flex; justify-content: flex-end; gap: 10px;">
-                                    <button id="cancelBtn" style="padding: 6px 12px; border-radius: 4px; border: none; background: #333; color: #fff; cursor: pointer;">Cancel</button>
-                                    <button id="okBtn" style="padding: 6px 12px; border-radius: 4px; border: none; background: #4a9eff; color: #fff; cursor: pointer;">OK</button>
-                                </div>
+                                <h3 style="color: #fff; margin: 0 0 15px 0; font-size: 16px;">${title}</h3>
+                                ${contentHTML}
+                            </div>
+                            <div style="display: flex; justify-content: flex-end; gap: 10px; border-top: 1px solid #333; padding-top: 15px;">
+                                <button class="skb-dialog-cancel" style="padding: 6px 12px; border-radius: 4px; border: none; background: #333; color: #fff; cursor: pointer;">Cancel</button>
+                                <button class="skb-dialog-ok" style="padding: 6px 12px; border-radius: 4px; border: none; background: #4a9eff; color: #fff; cursor: pointer;">OK</button>
                             </div>
                         `;
 
                         document.body.appendChild(dialog);
 
-                        const outlineColorInput = dialog.querySelector("#outlineColor");
-                        const outlineColorText = dialog.querySelector("#outlineColorText");
-                        const outlineWidthInput = dialog.querySelector("#outlineWidth");
-                        const outlineWidthValue = dialog.querySelector("#outlineWidthValue");
-                        const outlineEnabledInput = dialog.querySelector("#outlineEnabled");
-                        const okButton = dialog.querySelector("#okBtn");
-                        const cancelButton = dialog.querySelector("#cancelBtn");
+                        const okButton = dialog.querySelector(".skb-dialog-ok");
+                        const cancelButton = dialog.querySelector(".skb-dialog-cancel");
 
-                        outlineColorInput.oninput = () => {
-                            outlineColorText.value = outlineColorInput.value;
-                        };
-                        outlineColorText.oninput = () => {
-                            if (/^#[0-9A-F]{6}$/i.test(outlineColorText.value)) {
-                                outlineColorInput.value = outlineColorText.value;
-                            }
-                        };
 
-                        outlineWidthInput.oninput = () => {
-                            outlineWidthValue.textContent = `${outlineWidthInput.value}px`;
-                        };
+                        if (onSetup) {
+                            onSetup(dialog);
+                        }
 
                         okButton.onclick = () => {
-                            this.uiState.textOutline = outlineEnabledInput.checked;
-                            this.uiState.outlineColor = outlineColorInput.value;
-                            this.uiState.outlineWidth = parseInt(outlineWidthInput.value);
-                            
-                            if (this.widgets_by_name) {
-                                if (this.widgets_by_name.text_outline) {
-                                    this.widgets_by_name.text_outline.value = outlineEnabledInput.checked;
-                                }
-                                if (this.widgets_by_name.outline_color) {
-                                    this.widgets_by_name.outline_color.value = outlineColorInput.value;
-                                }
-                                if (this.widgets_by_name.outline_width) {
-                                    this.widgets_by_name.outline_width.value = parseInt(outlineWidthInput.value);
-                                }
+                            if (onOk) {
+                                onOk(dialog);
                             }
-                            
-                            this.setDirtyCanvas(true);
-                            this.serialize_widgets();
                             document.body.removeChild(dialog);
                         };
 
                         cancelButton.onclick = () => {
                             document.body.removeChild(dialog);
                         };
+
+
+                        [okButton, cancelButton].forEach(button => {
+                            const originalBg = button.style.background;
+                            button.onmouseover = () => button.style.opacity = "0.8";
+                            button.onmouseout = () => button.style.opacity = "1";
+                        });
+
+                        return dialog;
+                    };
+
+                    this.openOutlineDialog = () => {
+                        const currentColor = this.uiState.outlineColor || "#000000";
+                        const currentWidth = this.uiState.outlineWidth || 3;
+                        const currentEnabled = this.uiState.textOutline || false;
+
+                        const contentHTML = `
+                            <div style="margin-bottom: 15px;">
+                                <label style="color: #ccc; display: block; margin-bottom: 5px;">Outline Color:</label>
+                                <div style="display: flex; align-items: center; gap: 10px;">
+                                    <input type="color" id="outlineColor" value="${currentColor}"
+                                           style="width: 50px; height: 30px; padding: 0; border: none; background: none;">
+                                    <input type="text" id="outlineColorText" value="${currentColor}"
+                                           style="width: 80px; background: #2a2a2a; color: #fff; border: 1px solid #666; padding: 4px; border-radius: 3px;">
+                                </div>
+                            </div>
+
+                            <div style="margin-bottom: 15px;">
+                                <label style="color: #ccc; display: block; margin-bottom: 5px;">Outline Width:</label>
+                                <input type="range" id="outlineWidth" value="${currentWidth}" min="1" max="10" step="1"
+                                       style="width: 100%; background: #2a2a2a;">
+                                <span id="outlineWidthValue" style="color: #fff; margin-left: 10px;">${currentWidth}px</span>
+                            </div>
+
+                            <div style="margin-bottom: 15px;">
+                                <label style="display: flex; align-items: center; gap: 8px; color: #ccc; cursor: pointer;">
+                                    <input type="checkbox" id="outlineEnabled" ${currentEnabled ? 'checked' : ''}>
+                                    <span>Enable Outline</span>
+                                </label>
+                            </div>
+                        `;
+
+                        const onSetup = (dialog) => {
+                            const outlineColorInput = dialog.querySelector("#outlineColor");
+                            const outlineColorText = dialog.querySelector("#outlineColorText");
+                            const outlineWidthInput = dialog.querySelector("#outlineWidth");
+                            const outlineWidthValue = dialog.querySelector("#outlineWidthValue");
+
+                            outlineColorInput.oninput = () => {
+                                outlineColorText.value = outlineColorInput.value;
+                            };
+                            outlineColorText.oninput = () => {
+                                if (/^#[0-9A-F]{6}$/i.test(outlineColorText.value)) {
+                                    outlineColorInput.value = outlineColorText.value;
+                                }
+                            };
+
+                            outlineWidthInput.oninput = () => {
+                                outlineWidthValue.textContent = `${outlineWidthInput.value}px`;
+                            };
+                        };
+
+                        const onOk = (dialog) => {
+                            const outlineEnabledInput = dialog.querySelector("#outlineEnabled");
+                            const outlineColorInput = dialog.querySelector("#outlineColor");
+                            const outlineWidthInput = dialog.querySelector("#outlineWidth");
+
+                            this.uiState.textOutline = outlineEnabledInput.checked;
+                            this.uiState.outlineColor = outlineColorInput.value;
+                            this.uiState.outlineWidth = parseInt(outlineWidthInput.value);
+
+                            if (this.widgets_by_name) {
+                                if (this.widgets_by_name.text_outline) {
+                                    this.widgets_by_name.text_outline.value = this.uiState.textOutline;
+                                }
+                                if (this.widgets_by_name.outline_color) {
+                                    this.widgets_by_name.outline_color.value = this.uiState.outlineColor;
+                                }
+                                if (this.widgets_by_name.outline_width) {
+                                    this.widgets_by_name.outline_width.value = this.uiState.outlineWidth;
+                                }
+                            }
+
+                            this.setDirtyCanvas(true);
+                            this.serialize_widgets();
+                        };
+
+                        this._createDialog("Outline Settings", contentHTML, onSetup, onOk);
                     };
 
                     this.serialize_widgets = () => {
-                        if (this.widgets_by_name.reflect_x) {
-                            this.widgets_by_name.reflect_x.value = this.uiState.reflectX;
+                        if (!this.widgets_by_name) return;
+
+
+                        Object.entries({
+                            text: this.uiState.text,
+                            position_x: Math.round(this.uiState.position?.x || 0),
+                            position_y: Math.round(this.uiState.position?.y || 0),
+                            rotation: this.uiState.rotation || 0,
+                            is_bold: this.uiState.bold || false,
+                            is_italic: this.uiState.italic || false,
+                            text_align: this.uiState.align || 'center',
+                            font_size: this.uiState.fontSize || 32,
+                            text_color: this.uiState.textColor || "#FFFFFF",
+                            background_color: this.uiState.backgroundColor || "#000000",
+                            background_visible: this.uiState.backgroundVisible !== undefined ? this.uiState.backgroundVisible : true,
+                            text_outline: this.uiState.textOutline || false,
+                            outline_color: this.uiState.outlineColor || "#000000",
+                            outline_width: this.uiState.outlineWidth || 3,
+                            text_shadow: this.uiState.textShadow || false,
+                            font_family: this.uiState.fontFamily || "Arial",
+                            reflect_x: this.uiState.reflectX || false,
+                            reflect_y: this.uiState.reflectY || false,
+                            width: this.uiState.canvasWidth || 512,
+                            height: this.uiState.canvasHeight || 512,
+                            opacity: this.uiState.opacity !== undefined ? this.uiState.opacity : 1.0
+
+
+                        }).forEach(([key, value]) => {
+                            if (this.widgets_by_name[key]) {
+                                this.widgets_by_name[key].value = value;
+                            }
+                        });
+
+
+                        if (this.uiState.textGradient) {
+                            const startColor = this.uiState.textGradient.start || this.uiState.textColor || "#FFFFFF";
+                            const endColor = this.uiState.textGradient.end || this.uiState.textColor || "#FFFFFF";
+                            const angle = this.uiState.textGradient.angle || 0;
+                            if (this.widgets_by_name.text_gradient_start) this.widgets_by_name.text_gradient_start.value = startColor;
+                            if (this.widgets_by_name.text_gradient_end) this.widgets_by_name.text_gradient_end.value = endColor;
+                            if (this.widgets_by_name.text_gradient_angle) this.widgets_by_name.text_gradient_angle.value = angle;
+                        } else {
+                            if (this.widgets_by_name.text_gradient_start) this.widgets_by_name.text_gradient_start.value = "";
+                            if (this.widgets_by_name.text_gradient_end) this.widgets_by_name.text_gradient_end.value = "";
+                            if (this.widgets_by_name.text_gradient_angle) this.widgets_by_name.text_gradient_angle.value = 0;
                         }
-                        if (this.widgets_by_name.reflect_y) {
-                            this.widgets_by_name.reflect_y.value = this.uiState.reflectY;
-                        }
+
 
                         const base64Image = this.getCanvasImage();
-                        if (this.widgets_by_name.canvas_image && base64Image) {
-                            this.widgets_by_name.canvas_image.value = base64Image;
+                        if (this.widgets_by_name.canvas_image) {
+                           this.widgets_by_name.canvas_image.value = base64Image || "";
                         }
 
-                        if (this.onExecuted) {
-                            app.graph.runStep(this);
-                        }
+
+                         if (!this._initializing && this.onExecuted) {
+                             app.graph.runStep(this);
+                         }
                     };
 
-                    this.updateWidgets();
 
-                    this.tools = [
-                        { 
-                            icon: SVG.edit, 
-                            x: 4,
-                            tooltip: "Edit Text",
-                            action: () => {
-                                const currentText = this.widgets_by_name.text?.value || this.uiState.text || "";
-                                const newText = prompt("Enter text:", currentText);
-                                if (newText !== null) {
-                                    if (this.widgets_by_name.text) {
-                                        this.widgets_by_name.text.value = newText;
-                                        this.uiState.text = newText;
-                                    }
-                                    this.setDirtyCanvas(true);
-                                    this.serialize_widgets();
-                                }
-                            }
-                        },
-                        { type: 'divider', x: 28 },
-                        {
-                            icon: SVG.move,
-                            x: 32,
-                            tooltip: "Set Position",
-                            action: () => {
-                                this.openMoveDialog();
-                            }
-                        },
-                        { type: 'divider', x: 56 },
-                        { 
-                            icon: SVG.alignLeft, 
-                            x: 60,
-                            tooltip: "Align Left",
-                            action: () => {
-                                this.updateToolbarButton('align', 'left');
-                            }
-                        },
-                        { 
-                            icon: SVG.alignCenter, 
-                            x: 84,
-                            tooltip: "Center",
-                            action: () => {
-                                this.updateToolbarButton('align', 'center');
-                            }
-                        },
-                        { 
-                            icon: SVG.alignRight, 
-                            x: 108,
-                            tooltip: "Align Right",
-                            action: () => {
-                                this.updateToolbarButton('align', 'right');
-                            }
-                        },
-                        { type: 'divider', x: 132 },
-                        { 
-                            icon: SVG.bold, 
-                            x: 136,
-                            tooltip: "Bold",
-                            action: () => {
-                                this.updateToolbarButton('bold', !this.uiState.bold);
-                            }
-                        },
-                        { 
-                            icon: SVG.italic, 
-                            x: 160,
-                            tooltip: "Italic",
-                            action: () => {
-                                this.updateToolbarButton('italic', !this.uiState.italic);
-                            }
-                        },
-                        { type: 'divider', x: 184 },
-                        { 
-                            icon: SVG.fontSize, 
-                            x: 188,
-                            tooltip: "Font Size",
-                            action: () => {
-                                this.openFontSizeDialog();
-                            }
-                        },
-                        { 
-                            icon: SVG.font, 
-                            x: 212,
-                            tooltip: "Font Type",
-                            action: () => {
-                                this.openFontDialog();
-                            }
-                        },
-                        { type: 'divider', x: 236 },
-                        { 
-                            icon: SVG.color, 
-                            x: 240,
-                            tooltip: "Text Color",
-                            action: () => {
-                                this.openColorDialog();
-                            }
-                        },
-                        { 
-                            icon: SVG.shadow, 
-                            x: 264,
-                            tooltip: "Shadow",
-                            action: () => {
-                                this.openShadowDialog();
-                            }
-                        },
-                        { 
-                            icon: SVG.outline, 
-                            x: 288,
-                            tooltip: "Outline",
-                            action: () => {
-                                this.openOutlineDialog();
-                            }
-                        },
-                        { type: 'divider', x: 312 },
-                        { 
-                            icon: SVG.rotate, 
-                            x: 316,
-                            tooltip: "Rotate",
-                            action: () => {
-                                this.openRotationDialog();
-                            }
-                        },
-                        { 
-                            icon: SVG.reflectX, 
-                            x: 340,
-                            tooltip: "Reflect Horizontally",
-                            action: () => {
-                                this.uiState.reflectX = !this.uiState.reflectX;
-                                this.uiState.scale.x *= -1;
-                                if (this.widgets_by_name && this.widgets_by_name.reflect_x) {
-                                    this.widgets_by_name.reflect_x.value = this.uiState.reflectX;
-                                }
-                                this.setDirtyCanvas(true);
-                                this.serialize_widgets();
-                            }
-                        },
-                        { 
-                            icon: SVG.reflectY, 
-                            x: 364,
-                            tooltip: "Reflect Vertically",
-                            action: () => {
-                                this.uiState.reflectY = !this.uiState.reflectY;
-                                this.uiState.scale.y *= -1;
-                                if (this.widgets_by_name && this.widgets_by_name.reflect_y) {
-                                    this.widgets_by_name.reflect_y.value = this.uiState.reflectY;
-                                }
-                                this.setDirtyCanvas(true);
-                                this.serialize_widgets();
-                            }
-                        },
-                        { type: 'divider', x: 388 },
-                        { 
-                            icon: SVG.frame, 
-                            x: 392,
-                            tooltip: "Frame Settings",
-                            action: () => {
-                                this.openFrameSizeDialog();
-                            }
-                        },
-                        { type: 'divider', x: 416 },
-                        { 
-                            icon: SVG.layout, 
-                            x: 420,
-                            tooltip: "Full Size",
-                            action: () => {
-                                this.uiState.isCompact = false;
-                                this.size[1] = 600;
-                                this.setDirtyCanvas(true);
-                            }
-                        },
-                        { 
-                            icon: SVG.compact, 
-                            x: 444,
-                            tooltip: "Compact Mode",
-                            action: () => {
-                                this.uiState.isCompact = true;
-                                this.size[1] = 300;
-                                this.setDirtyCanvas(true);
-                            }
-                        }
-                    ];
 
-                    this.isDragging = false;
-                    this.startX = 0;
-                    this.startY = 0;
-                    this.startPosX = 0;
-                    this.startPosY = 0;
+                    this.serialize_widgets();
+
+
+                    this.tools = JSON.parse(JSON.stringify(TOOLBAR_TOOLS));
 
                     const handleGlobalMouseUp = () => {
                         if (this.isDragging) {
@@ -642,7 +339,7 @@ app.registerExtension({
                     };
 
                     document.addEventListener('mouseup', handleGlobalMouseUp);
-                    
+
                     const oldOnRemoved = this.onRemoved;
                     this.onRemoved = () => {
                         document.removeEventListener('mouseup', handleGlobalMouseUp);
@@ -654,12 +351,14 @@ app.registerExtension({
                     if (!this.flags.collapsed) {
                         try {
                             const nodeWidth = this.size[0] || 400;
-                            const nodeHeight = this.size[1] || 300;
-                            const toolbarHeight = 40;
-                            const cornerRadius = 10;
+                            const nodeHeight = this.size[1] || 600;
+
+
+                            const toolbarHeight = 30;
+                            const cornerRadius = 8;
 
                             ctx.save();
-                            
+
                             ctx.fillStyle = "#151515";
                             ctx.beginPath();
                             ctx.roundRect(0, 0, nodeWidth, nodeHeight, cornerRadius);
@@ -669,23 +368,38 @@ app.registerExtension({
                             const canvasY = toolbarHeight + 10;
                             const canvasWidth = nodeWidth - 20;
                             const canvasHeight = nodeHeight - toolbarHeight - 20;
-
                             if (this.uiState.backgroundVisible) {
                                 ctx.fillStyle = this.uiState.backgroundColor;
                                 ctx.fillRect(canvasX, canvasY, canvasWidth, canvasHeight);
                             }
 
-                            const realWidth = this.widgets_by_name.width.value;
-                            const realHeight = this.widgets_by_name.height.value;
+
+                            let realWidth = 512;
+                            let realHeight = 512;
+
+
+                            if (this.widgets_by_name && this.widgets_by_name.width && typeof this.widgets_by_name.width.value !== 'undefined') {
+                                realWidth = this.widgets_by_name.width.value;
+                            }
+
+                            if (this.widgets_by_name && this.widgets_by_name.height && typeof this.widgets_by_name.height.value !== 'undefined') {
+                                realHeight = this.widgets_by_name.height.value;
+                            }
+
+
                             const scale = Math.min(canvasWidth / realWidth, canvasHeight / realHeight);
+
                             const scaledWidth = realWidth * scale;
                             const scaledHeight = realHeight * scale;
                             const offsetX = canvasX + (canvasWidth - scaledWidth) / 2;
                             const offsetY = canvasY + (canvasHeight - scaledHeight) / 2;
 
+
                             ctx.strokeStyle = "rgba(80, 100, 255, 0.8)";
                             ctx.lineWidth = 2;
                             ctx.strokeRect(canvasX, canvasY, canvasWidth, canvasHeight);
+
+
 
                             ctx.strokeStyle = "rgba(255, 100, 100, 0.8)";
                             ctx.lineWidth = 2;
@@ -693,23 +407,25 @@ app.registerExtension({
                             ctx.strokeRect(offsetX, offsetY, scaledWidth, scaledHeight);
                             ctx.setLineDash([]);
 
+
                             ctx.strokeStyle = "rgba(80, 100, 255, 0.2)";
                             ctx.lineWidth = 1;
                             const gridSize = Math.max(20 * scale, 10);
-                            
+
                             for(let y = offsetY; y <= offsetY + scaledHeight; y += gridSize) {
                                 ctx.beginPath();
                                 ctx.moveTo(offsetX, y);
                                 ctx.lineTo(offsetX + scaledWidth, y);
                                 ctx.stroke();
                             }
-                            
+
                             for(let x = offsetX; x <= offsetX + scaledWidth; x += gridSize) {
                                 ctx.beginPath();
                                 ctx.moveTo(x, offsetY);
                                 ctx.lineTo(x, offsetY + scaledHeight);
                                 ctx.stroke();
                             }
+
 
                             ctx.strokeStyle = "rgba(255, 255, 255, 0.3)";
                             ctx.lineWidth = 1;
@@ -722,27 +438,54 @@ app.registerExtension({
                             ctx.stroke();
                             ctx.setLineDash([]);
 
-                            ctx.font = "bold 14px Arial";
+
+                            const baseFontSize = 14;
+                            const minFontSize = 8;
+                            const fontSizeFactor = Math.min(canvasWidth, canvasHeight) / 400;
+                            const fontSize = Math.max(minFontSize, Math.floor(baseFontSize * fontSizeFactor));
+
+                            ctx.font = `bold ${fontSize}px Arial`;
                             ctx.fillStyle = "#fff";
                             ctx.textAlign = "left";
-                            ctx.fillText(`Canvas: ${realWidth}x${realHeight}`, offsetX + 10, offsetY + 25);
-                            ctx.fillText(`Scale: ${Math.round(scale * 100)}%`, offsetX + 10, offsetY + 45);
+
+
+                            const textPadding = Math.max(5, Math.floor(10 * fontSizeFactor));
+
+
+                            if (canvasWidth < 150) {
+                                ctx.fillText(`${realWidth}×${realHeight}`, offsetX + textPadding, offsetY + fontSize + textPadding);
+                                ctx.fillText(`${Math.round(scale * 100)}%`, offsetX + textPadding, offsetY + (fontSize * 2) + textPadding * 1.5);
+                            } else {
+                                ctx.fillText(`Canvas: ${realWidth}×${realHeight}`, offsetX + textPadding, offsetY + fontSize + textPadding);
+                                ctx.fillText(`Scale: ${Math.round(scale * 100)}%`, offsetX + textPadding, offsetY + (fontSize * 2) + textPadding * 1.5);
+                            }
+
 
                             this.drawToolbar(ctx, nodeWidth, toolbarHeight, cornerRadius);
+
 
                             const text = this.widgets_by_name.text?.value || this.uiState.text || "Enter Text";
                             if (text) {
                                 ctx.save();
-                                
+
+
+                                ctx.save();
+                                ctx.beginPath();
+                                ctx.rect(offsetX, offsetY, scaledWidth, scaledHeight);
+                                ctx.clip();
+
+
                                 ctx.translate(offsetX, offsetY);
 
                                 let fontStyle = "";
                                 if (this.uiState.bold) fontStyle += "bold ";
                                 if (this.uiState.italic) fontStyle += "italic ";
-                                ctx.font = `${fontStyle}${this.uiState.fontSize}px ${this.uiState.fontFamily}`;
+
+                                const fontFamily = this.uiState.fontFamily || "Montserrat";
+                                ctx.font = `${fontStyle}${this.uiState.fontSize}px "${fontFamily}", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif`;
                                 ctx.fillStyle = this.uiState.textColor;
-                                
-                                const lines = text.split('\n');
+
+                                const lines = text.split('\\n');
                                 const lineHeight = this.uiState.fontSize + 4;
                                 const totalHeight = lines.length * lineHeight;
                                 let maxWidth = 0;
@@ -763,7 +506,7 @@ app.registerExtension({
 
                                 ctx.textAlign = this.uiState.align;
                                 ctx.textBaseline = "middle";
-                                
+
                                 let alignOffsetX = 0;
                                 const padding = 20;
                                 switch(this.uiState.align) {
@@ -776,10 +519,10 @@ app.registerExtension({
                                     default:
                                         alignOffsetX = 0;
                                 }
-                                
+
                                 lines.forEach((line, i) => {
                                     const y = -totalHeight/2 + i * lineHeight + lineHeight/2;
-                                    
+
                                     if (this.uiState.textShadow) {
                                         ctx.save();
                                         ctx.shadowColor = this.uiState.shadowColor || "rgba(0, 0, 0, 0.5)";
@@ -790,13 +533,13 @@ app.registerExtension({
                                         ctx.fillText(line, alignOffsetX, y);
                                         ctx.restore();
                                     }
-                                    
+
                                     if (this.uiState.textOutline) {
                                         ctx.save();
                                         ctx.strokeStyle = this.uiState.outlineColor;
                                         ctx.lineWidth = this.uiState.outlineWidth;
                                         ctx.lineJoin = "round";
-                                        
+
                                         const steps = 16;
                                         for (let j = 0; j < steps; j++) {
                                             const angle = (j / steps) * Math.PI * 2;
@@ -806,39 +549,45 @@ app.registerExtension({
                                         }
                                         ctx.restore();
                                     }
-                                    
+
                                     if (this.uiState.textGradient) {
                                         ctx.save();
                                         const gradientWidth = maxWidth;
                                         const gradientHeight = totalHeight;
                                         const centerX = alignOffsetX;
                                         const centerY = y;
-                                        
+
                                         const angle = ((this.uiState.textGradient.angle - 90) % 360) * (Math.PI / 180);
-                                        
+
                                         const dx = Math.cos(angle);
                                         const dy = Math.sin(angle);
-                                        
+
                                         const length = Math.sqrt(gradientWidth * gradientWidth + gradientHeight * gradientHeight);
-                                        
+
                                         const startX = centerX - dx * length / 2;
                                         const startY = centerY - dy * length / 2;
                                         const endX = centerX + dx * length / 2;
                                         const endY = centerY + dy * length / 2;
-                                        
+
                                         const gradient = ctx.createLinearGradient(startX, startY, endX, endY);
-                                        gradient.addColorStop(0, this.uiState.textGradient.start);
-                                        gradient.addColorStop(1, this.uiState.textGradient.end);
-                                        
+
+
+                                        const startColor = this.uiState.textGradient.start || this.uiState.textColor;
+                                        const endColor = this.uiState.textGradient.end || this.uiState.textColor;
+
+                                        gradient.addColorStop(0, startColor);
+                                        gradient.addColorStop(1, endColor);
+
                                         ctx.fillStyle = gradient;
                                         ctx.fillText(line, alignOffsetX, y);
                                         ctx.restore();
                                     } else {
-                                    ctx.fillStyle = this.uiState.textColor;
-                                    ctx.fillText(line, alignOffsetX, y);
+                                        ctx.fillStyle = this.uiState.textColor;
+                                        ctx.fillText(line, alignOffsetX, y);
                                     }
                                 });
-                                
+
+                                ctx.restore();
                                 ctx.restore();
                             }
 
@@ -853,127 +602,372 @@ app.registerExtension({
                 },
 
                 drawToolbar(ctx, nodeWidth, toolbarHeight, cornerRadius) {
-                    const toolbarGradient = ctx.createLinearGradient(0, 0, 0, toolbarHeight);
-                    toolbarGradient.addColorStop(0, "#1d1d1d");
-                    toolbarGradient.addColorStop(1, "#1a1a1a");
-                    ctx.fillStyle = toolbarGradient;
+
+                    if (!this.toolbar) {
+                        this.toolbar = TOOLBAR_TOOLS;
+                    }
+
+
+                    const buttonSize = 14;
+                    const buttonSpacing = 0;
+                    const leftMargin = 3;
+
+
+                    ctx.fillStyle = "#222";
                     ctx.beginPath();
                     ctx.roundRect(0, 0, nodeWidth, toolbarHeight, [cornerRadius, cornerRadius, 0, 0]);
                     ctx.fill();
 
-                    ctx.shadowColor = "rgba(0, 0, 0, 0.3)";
-                    ctx.shadowBlur = 3;
-                    ctx.shadowOffsetY = 1;
+
+                    ctx.strokeStyle = "#444";
+                    ctx.lineWidth = 1;
                     ctx.beginPath();
                     ctx.moveTo(0, toolbarHeight);
                     ctx.lineTo(nodeWidth, toolbarHeight);
-                    ctx.strokeStyle = "rgba(0, 0, 0, 0.2)";
-                    ctx.lineWidth = 1;
                     ctx.stroke();
 
-                    ctx.shadowColor = "transparent";
-                    ctx.shadowBlur = 0;
-                    ctx.shadowOffsetY = 0;
 
-                    this.tools.forEach(tool => {
+
+
+
+                    const availableWidth = nodeWidth - 2 * leftMargin + 22;
+                    const buttonsPerRow = Math.floor(availableWidth / (buttonSize + buttonSpacing));
+
+                    if (buttonsPerRow < 1) {
+
+                        return;
+                    }
+
+
+                    const maxButtons = Math.min(this.toolbar.length, buttonsPerRow);
+
+
+                    let x = leftMargin;
+                    let y = (toolbarHeight - buttonSize) / 2;
+
+                    for (let i = 0; i < maxButtons; i++) {
+                        const tool = this.toolbar[i];
+
                         if (tool.type === 'divider') {
-                            const divGradient = ctx.createLinearGradient(0, 6, 0, 24);
-                            divGradient.addColorStop(0, "rgba(80, 100, 255, 0.1)");
-                            divGradient.addColorStop(0.5, "rgba(80, 100, 255, 0.2)");
-                            divGradient.addColorStop(1, "rgba(80, 100, 255, 0.1)");
-                            ctx.fillStyle = divGradient;
-                            ctx.fillRect(tool.x, 6, 1, 18);
-                        } else {
-                            const isHovered = this.uiState.hoveredButton === tool.icon;
-                            const isActive = this.isToolActive(tool);
-                            drawToolbarButton(ctx, tool.x, 3, 20, 20, tool.icon, this, isActive, isHovered, tool.tooltip);
-                        }
-                    });
-                },
 
-                isToolActive(tool) {
-                    return (tool.icon === SVG.alignLeft && this.uiState.align === 'left') ||
-                           (tool.icon === SVG.alignCenter && this.uiState.align === 'center') ||
-                           (tool.icon === SVG.alignRight && this.uiState.align === 'right') ||
-                           (tool.icon === SVG.bold && this.uiState.bold) ||
-                           (tool.icon === SVG.italic && this.uiState.italic) ||
-                           (tool.icon === SVG.shadow && this.uiState.textShadow) ||
-                           (tool.icon === SVG.outline && this.uiState.textOutline) ||
-                           (tool.icon === SVG.reflectX && this.uiState.reflectX) ||
-                           (tool.icon === SVG.reflectY && this.uiState.reflectY);
+                            if (x + 1 <= nodeWidth - leftMargin) {
+                                ctx.strokeStyle = "#444";
+                                ctx.lineWidth = 1;
+                                ctx.beginPath();
+                                ctx.moveTo(x + 1, y);
+                                ctx.lineTo(x + 1, y + buttonSize);
+                                ctx.stroke();
+                                x += 2;
+                            }
+                        } else {
+
+                            let isActive = false;
+                            if (tool.action === 'toggleBold') isActive = this.uiState.bold;
+                            else if (tool.action === 'toggleItalic') isActive = this.uiState.italic;
+                            else if (tool.action === 'alignLeft') isActive = this.uiState.align === 'left';
+                            else if (tool.action === 'alignCenter') isActive = this.uiState.align === 'center';
+                            else if (tool.action === 'alignRight') isActive = this.uiState.align === 'right';
+                            else if (tool.action === 'reflectX') isActive = this.uiState.reflectX;
+                            else if (tool.action === 'reflectY') isActive = this.uiState.reflectY;
+
+                            const indicatorY = y + buttonSize + 1; 
+                            if (isActive) {
+                                ctx.fillStyle = "#6750A4"; 
+                                ctx.fillRect(x, indicatorY, buttonSize, 2); 
+                            } else if (this.hoveredButton === i) {
+                                ctx.fillStyle = "#49454F"; 
+                                ctx.fillRect(x, indicatorY, buttonSize, 1); 
+                            }
+
+                            ctx.save(); 
+                            const svgString = tool.icon;
+                            if (svgString) {
+                                const iconSize = buttonSize; 
+                                const iconX = x;
+                                const iconY = y;
+
+                                const iconColor = isActive ? "#6750A4" : (this.hoveredButton === i ? "#E8DEF8" : "#bbbbbb");
+                                
+                                const coloredSvgString = svgString.replace(/currentColor/g, iconColor);
+                                const img = new Image();
+                                img.src = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(coloredSvgString);
+
+                                try {
+                                    if (img.complete && img.naturalWidth > 0) {
+                                        if (!this._iconCanvas) { 
+                                            this._iconCanvas = document.createElement('canvas');
+                                            this._iconCanvas.width = 24; 
+                                            this._iconCanvas.height = 24;
+                                        }
+                                        const iconCtx = this._iconCanvas.getContext('2d');
+                                        iconCtx.clearRect(0, 0, 24, 24); 
+                                        iconCtx.drawImage(img, 0, 0, 24, 24); 
+                                        ctx.drawImage(this._iconCanvas, iconX, iconY, iconSize, iconSize); 
+                                    } else {
+                                        
+                                        img.onerror = () => { 
+                                             console.warn(`Failed to load SVG icon for action: ${tool.action}`);
+                                             this.renderFallbackIcon(ctx, tool, iconX, iconY, iconSize, iconColor);
+                                             this.setDirtyCanvas(true); 
+                                        };
+                                        img.onload = () => { 
+                                             this.setDirtyCanvas(true); 
+                                        };
+                                        
+                                        if (!img.complete) {
+                                            this.renderFallbackIcon(ctx, tool, iconX, iconY, iconSize, iconColor);
+                                        }
+                                    }
+                                } catch (error) {
+                                    console.error("Icon rendering error:", error);
+                                    
+                                    ctx.fillStyle = iconColor;
+                                    ctx.beginPath();
+                                    ctx.arc(iconX + iconSize / 2, iconY + iconSize / 2, 3, 0, Math.PI * 2);
+                                    ctx.fill();
+                                }
+                            }
+                            ctx.restore(); 
+
+                            
+                            if (this.hoveredButton === i && tool.tooltip) {
+                                const tooltipPadding = 6;
+                                const tooltipHeight = 20;
+
+                                ctx.font = "11px 'Roboto', Inter, Arial"; 
+                                ctx.textAlign = "center";
+                                ctx.textBaseline = "middle";
+                                
+                                const tooltipWidth = ctx.measureText(tool.tooltip).width + (tooltipPadding * 2);
+
+                                let tooltipX = x + (buttonSize / 2) - (tooltipWidth / 2); 
+                                const tooltipY = y + buttonSize + 6; 
+
+                                const nodeWidth = this.size[0];
+                                if (tooltipX < 5) tooltipX = 5;
+                                if (tooltipX + tooltipWidth > nodeWidth - 5) tooltipX = nodeWidth - 5 - tooltipWidth;
+
+                                ctx.fillStyle = "rgba(33, 33, 33, 0.9)"; 
+                                ctx.beginPath();
+                                ctx.roundRect(tooltipX, tooltipY, tooltipWidth, tooltipHeight, 4); 
+                                ctx.fill();
+
+                                ctx.fillStyle = "#ffffff"; 
+                                ctx.fillText(tool.tooltip, tooltipX + tooltipWidth / 2, tooltipY + tooltipHeight / 2);
+                            } 
+
+                            x += buttonSize + buttonSpacing;
+                        }
+                    }
                 },
 
                 onMouseDown(e) {
-                    const localX = e.canvasX - this.pos[0];
-                    const localY = e.canvasY - this.pos[1];
-                    const toolbarHeight = 26;
+                    const x = e.canvasX - this.pos[0];
+                    const y = e.canvasY - this.pos[1];
 
-                    if (localY <= toolbarHeight) {
-                        for (const tool of this.tools) {
-                            if (tool.type === 'divider') continue;
-                            
-                            if (localX >= tool.x && localX <= tool.x + 20 &&
-                                localY >= 3 && localY <= 23) {
-                                if (tool.action) {
-                                    tool.action.call(this);
-                                    this.setDirtyCanvas(true);
-                                    return true;
+                    if (!this.toolbar) {
+                        this.toolbar = TOOLBAR_TOOLS;
+                    }
+
+                    const toolbarHeight = 30;
+                    const buttonSize = 14;
+                    const buttonSpacing = 0;
+                    const leftMargin = 3;
+
+                    if (y < toolbarHeight) {
+                        let currentX = leftMargin;
+                        let buttonY = (toolbarHeight - buttonSize) / 2;
+
+                        for (let i = 0; i < this.toolbar.length; i++) {
+                            const tool = this.toolbar[i];
+
+                            if (tool.type === 'divider') {
+                                if (currentX + 2 > this.size[0] - leftMargin) {
+                                    break;
                                 }
+                                currentX += 2;
+                                continue;
                             }
+
+                            if (currentX + buttonSize > this.size[0] - leftMargin) {
+                                break;
+                            }
+
+                            if (x >= currentX && x <= currentX + buttonSize &&
+                                y >= buttonY && y <= buttonY + buttonSize) {
+
+                                if (tool.action) {
+                                    this.executeToolAction(tool.action);
+                                }
+                                return true;
+                            }
+
+                            currentX += buttonSize + buttonSpacing;
                         }
+
                         return false;
+                    }
+
+                    const canvasX = 10;
+                    const canvasY = toolbarHeight + 10;
+                    const canvasWidth = this.size[0] - 20;
+                    const canvasHeight = this.size[1] - toolbarHeight - 20;
+
+
+                    if (x >= canvasX + 2 && x <= canvasX + canvasWidth - 2 &&
+                        y >= canvasY + 2 && y <= canvasY + canvasHeight - 2) {
+
+                        this.uiState.isSelected = true;
+                        this.uiState.isDragging = true;
+                        this.uiState.dragStart = { x, y };
+
+                        this.setDirtyCanvas(true);
+                        return true;
                     }
 
                     return false;
                 },
 
                 onMouseMove(e) {
-                    const localX = e.canvasX - this.pos[0];
-                    const localY = e.canvasY - this.pos[1];
-                    const toolbarHeight = 26;
+                    const x = e.canvasX - this.pos[0];
+                    const y = e.canvasY - this.pos[1];
+                    
+                    let handled = false;
+                    
+                    
+                    if (!this.toolbar) {
+                        this.toolbar = TOOLBAR_TOOLS;
+                    }
 
-                    if (localY <= toolbarHeight) {
-                        for (const tool of this.tools) {
-                            if (tool.type === 'divider') continue;
+                    
+                    const toolbarHeight = 30;
+                    const buttonSize = 14;
+                    const buttonSpacing = 0;
+                    const leftMargin = 3;
+
+                    
+                    if (y < toolbarHeight) {
+                        let currentX = leftMargin;
+                        let buttonY = (toolbarHeight - buttonSize) / 2;
+                        let hoveredIndex = -1;
+                        
+                        for (let i = 0; i < this.toolbar.length; i++) {
+                            const tool = this.toolbar[i];
                             
-                            if (localX >= tool.x && localX <= tool.x + 20 &&
-                                localY >= 3 && localY <= 23) {
-                                if (this.uiState.hoveredButton !== tool.icon) {
-                                    this.uiState.hoveredButton = tool.icon;
-                                    this.setDirtyCanvas(true);
+                            if (tool.type === 'divider') {
+                                
+                                if (currentX + 2 > this.size[0] - leftMargin) {
+                                    break; 
                                 }
-                                return true;
+                                currentX += 2;
+                                continue;
                             }
+                            
+                            
+                            if (currentX + buttonSize > this.size[0] - leftMargin) {
+                                break; 
+                            }
+                            
+                            
+                            if (x >= currentX && x <= currentX + buttonSize && 
+                                y >= buttonY && y <= buttonY + buttonSize) {
+                                hoveredIndex = i;
+                                break;
+                            }
+                            
+                            currentX += buttonSize + buttonSpacing;
                         }
                         
-                        if (this.uiState.hoveredButton) {
-                            this.uiState.hoveredButton = null;
+                        
+                        if (this.hoveredButton !== hoveredIndex) {
+                            this.hoveredButton = hoveredIndex;
                             this.setDirtyCanvas(true);
+                            handled = true;
+                        }
+                    } else if (this.hoveredButton !== -1) {
+                        
+                        this.hoveredButton = -1;
+                        this.setDirtyCanvas(true);
+                        handled = true;
+                    }
+                        
+                    
+                    if (this.uiState.isDragging && this.uiState.dragStart) {
+                        const dragOffsetX = x - this.uiState.dragStart.x;
+                        const dragOffsetY = y - this.uiState.dragStart.y;
+                        
+                        
+                        const canvasX = 10;
+                        const canvasY = toolbarHeight + 10;
+                        const canvasWidth = this.size[0] - 20;
+                        const canvasHeight = this.size[1] - toolbarHeight - 20;
+                        
+                        
+                        let realWidth = 512;
+                        let realHeight = 512;
+                        
+                        if (this.widgets_by_name && this.widgets_by_name.width && typeof this.widgets_by_name.width.value !== 'undefined') {
+                            realWidth = this.widgets_by_name.width.value;
+                        }
+                        
+                        if (this.widgets_by_name && this.widgets_by_name.height && typeof this.widgets_by_name.height.value !== 'undefined') {
+                            realHeight = this.widgets_by_name.height.value;
+                        }
+                        
+                        const scale = Math.min(canvasWidth / realWidth, canvasHeight / realHeight);
+                        
+                        
+                        const scaledDragX = dragOffsetX / scale;
+                        const scaledDragY = dragOffsetY / scale;
+                        
+                        
+                        this.uiState.dragStart = { x, y };
+                        
+                        if (this.widgets_by_name.position_x && this.widgets_by_name.position_y) {
+                            const newX = Math.max(0, Math.min(realWidth, this.uiState.position.x + scaledDragX));
+                            const newY = Math.max(0, Math.min(realHeight, this.uiState.position.y + scaledDragY));
+                            
+                            this.widgets_by_name.position_x.value = Math.round(newX);
+                            this.widgets_by_name.position_y.value = Math.round(newY);
+                            
+                            this.uiState.position.x = newX;
+                            this.uiState.position.y = newY;
+                            
+                            this.setDirtyCanvas(true);
+                            handled = true;
                         }
                     }
 
-                    return false;
+                    return handled; 
                 },
 
                 onMouseUp(e) {
-                    return false;
+                    
+                    if (this.uiState.isDragging) {
+                        this.uiState.isDragging = false;
+                        this.uiState.dragStart = null;
+                        
+                        
+                        this.serialize_widgets();
+                        
+                        this.setDirtyCanvas(true);
+                        return true; 
+                    }
+                    return false; 
                 },
 
                 onMouseLeave(e) {
-                    if (this.isDraggingSlider) {
-                        this.isDraggingSlider = null;
-                        this.dragStartX = null;
-                        this.dragStartY = null;
-                        this.dragStartValue = null;
-                        
-                        this.serialize_widgets();
-                        this.setDirtyCanvas(true);
-                    } else {
+                    let handled = false;
+                    
+                    if (this.uiState.isSelected || this.uiState.hoveredSlider || this.uiState.hoveredButton) {
                         this.uiState.isSelected = false;
                         this.uiState.hoveredSlider = null;
                         this.uiState.hoveredButton = null;
                         this.setDirtyCanvas(true);
+                        handled = true;
                     }
+                    
+                    return handled;
                 },
 
                 onDblClick(e) {
@@ -1029,51 +1023,6 @@ app.registerExtension({
                     }
                 },
 
-                updateWidgets() {
-                    if (this.widgets_by_name.text) {
-                        const realWidth = this.widgets_by_name.width.value;
-                        const realHeight = this.widgets_by_name.height.value;
-
-                        this.uiState.position.x = Math.max(0, Math.min(realWidth, this.uiState.position.x));
-                        this.uiState.position.y = Math.max(0, Math.min(realHeight, this.uiState.position.y));
-
-                        const minDimension = Math.min(realWidth, realHeight);
-                        const maxFontSize = Math.round(minDimension * 0.2);
-                        this.uiState.fontSize = Math.min(this.uiState.fontSize, maxFontSize);
-
-                        Object.entries({
-                            text: this.uiState.text,
-                            position_x: Math.round(this.uiState.position.x),
-                            position_y: Math.round(this.uiState.position.y),
-                            rotation: this.uiState.rotation,
-                            is_bold: this.uiState.bold,
-                            is_italic: this.uiState.italic,
-                            text_align: this.uiState.align,
-                            font_size: this.uiState.fontSize,
-                            text_color: this.uiState.textColor,
-                            background_color: this.uiState.backgroundColor,
-                            text_outline: this.uiState.textOutline,
-                            outline_color: this.uiState.outlineColor,
-                            outline_width: this.uiState.outlineWidth,
-                            reflect_x: this.uiState.reflectX,
-                            reflect_y: this.uiState.reflectY
-                        }).forEach(([key, value]) => {
-                            if (this.widgets_by_name[key]) {
-                                this.widgets_by_name[key].value = value;
-                            }
-                        });
-
-                        const base64Image = this.getCanvasImage();
-                        if (this.widgets_by_name.canvas_image && base64Image) {
-                            this.widgets_by_name.canvas_image.value = base64Image;
-                        }
-
-                        if (this.onExecuted) {
-                            app.graph.runStep(this);
-                        }
-                    }
-                },
-
                 updateToolbarButton(type, value) {
                     switch(type) {
                         case 'bold':
@@ -1111,242 +1060,85 @@ app.registerExtension({
                     this.setDirtyCanvas(true);
                 },
 
-                calculateDialogPosition(baseX, baseY, dialogWidth, dialogHeight) {
-                    const screenPadding = 10;
-                    const screenWidth = window.innerWidth;
-                    const screenHeight = window.innerHeight;
+                
+                _createSimpleSliderDialog(title, propertyName, rangeMin, rangeMax, rangeStep, valueSuffix = '') {
+                    const currentValue = this.uiState[propertyName];
 
-                    let x = Math.max(screenPadding, baseX);
-                    x = Math.min(x, screenWidth - dialogWidth - screenPadding);
-
-                    let y = Math.max(screenPadding, baseY);
-                    y = Math.min(y, screenHeight - dialogHeight - screenPadding);
-
-                    return { x, y };
-                },
-
-                openFontSizeDialog() {
-                    const dialog = document.createElement("div");
-                    dialog.style.cssText = `
-                        position: fixed;
-                        left: 50%;
-                        top: 50%;
-                        transform: translate(-50%, -50%);
-                        background: #1e1e1e;
-                        border: 1px solid #4a9eff;
-                        padding: 20px;
-                        border-radius: 4px;
-                        z-index: 10000;
-                        min-width: 300px;
-                    `;
-
-                    dialog.innerHTML = `
+                    const contentHTML = `
                         <div style="margin-bottom: 15px;">
-                            <label style="color: #ccc; display: block; margin-bottom: 5px;">Font Size:</label>
-                            <input type="range" id="fontSize" value="${this.uiState.fontSize}" min="8" max="128" step="1"
+                            <label style="color: #ccc; display: block; margin-bottom: 5px;">${title}:</label>
+                            <input type="range" id="sliderInput" value="${currentValue}" min="${rangeMin}" max="${rangeMax}" step="${rangeStep}"
                                    style="width: 200px; margin-right: 10px;">
-                            <span id="fontSizeValue" style="color: #fff;">${this.uiState.fontSize}px</span>
-                        </div>
-                        <div style="text-align: right;">
-                            <button id="cancel" style="margin-right: 10px; padding: 5px 15px; background: #333; color: #fff; border: none; border-radius: 3px;">Cancel</button>
-                            <button id="ok" style="padding: 5px 15px; background: #4a9eff; color: #fff; border: none; border-radius: 3px;">OK</button>
+                            <span id="sliderValue" style="color: #fff;">${currentValue}${valueSuffix}</span>
                         </div>
                     `;
 
-                    document.body.appendChild(dialog);
-
-                    const slider = dialog.querySelector("#fontSize");
-                    const valueDisplay = dialog.querySelector("#fontSizeValue");
-                    const okButton = dialog.querySelector("#ok");
-                    const cancelButton = dialog.querySelector("#cancel");
-
-                    slider.oninput = () => {
-                        valueDisplay.textContent = `${slider.value}px`;
+                    const onSetup = (dialog) => {
+                        const slider = dialog.querySelector("#sliderInput");
+                        const valueDisplay = dialog.querySelector("#sliderValue");
+                        slider.oninput = () => {
+                            valueDisplay.textContent = `${slider.value}${valueSuffix}`;
+                        };
                     };
 
-                    okButton.onclick = () => {
-                        this.uiState.fontSize = parseInt(slider.value);
-                        this.widgets_by_name.font_size.value = parseInt(slider.value);
+                    const onOk = (dialog) => {
+                        const slider = dialog.querySelector("#sliderInput");
+                        const newValue = propertyName === 'rotation' ? parseInt(slider.value) : parseFloat(slider.value); 
+                        this.uiState[propertyName] = newValue;
+                        if (this.widgets_by_name[propertyName]) {
+                            this.widgets_by_name[propertyName].value = newValue;
+                        }
                         this.setDirtyCanvas(true);
                         this.serialize_widgets();
-                        document.body.removeChild(dialog);
                     };
 
-                    cancelButton.onclick = () => {
-                        document.body.removeChild(dialog);
-                    };
+                    this._createDialog(title, contentHTML, onSetup, onOk);
+                },
+                
+                openFontSizeDialog() {
+                    this._createSimpleSliderDialog("Font Size", "fontSize", 8, 128, 1, "px");
                 },
 
                 openRotationDialog() {
-                    const dialog = document.createElement("div");
-                    dialog.style.cssText = `
-                        position: fixed;
-                        left: 50%;
-                        top: 50%;
-                        transform: translate(-50%, -50%);
-                        background: #1e1e1e;
-                        border: 1px solid #4a9eff;
-                        padding: 20px;
-                        border-radius: 4px;
-                        z-index: 10000;
-                        min-width: 300px;
-                    `;
-
-                    dialog.innerHTML = `
-                        <div style="margin-bottom: 15px;">
-                            <label style="color: #ccc; display: block; margin-bottom: 5px;">Rotation:</label>
-                            <input type="range" id="rotation" value="${this.uiState.rotation}" min="-180" max="180" step="1"
-                                   style="width: 200px; margin-right: 10px;">
-                            <span id="rotationValue" style="color: #fff;">${this.uiState.rotation}°</span>
-                        </div>
-                        <div style="text-align: right;">
-                            <button id="cancel" style="margin-right: 10px; padding: 5px 15px; background: #333; color: #fff; border: none; border-radius: 3px;">Cancel</button>
-                            <button id="ok" style="padding: 5px 15px; background: #4a9eff; color: #fff; border: none; border-radius: 3px;">OK</button>
-                        </div>
-                    `;
-
-                    document.body.appendChild(dialog);
-
-                    const slider = dialog.querySelector("#rotation");
-                    const valueDisplay = dialog.querySelector("#rotationValue");
-                    const okButton = dialog.querySelector("#ok");
-                    const cancelButton = dialog.querySelector("#cancel");
-
-                    slider.oninput = () => {
-                        valueDisplay.textContent = `${slider.value}°`;
-                    };
-
-                    okButton.onclick = () => {
-                        this.uiState.rotation = parseInt(slider.value);
-                        this.widgets_by_name.rotation.value = parseInt(slider.value);
-                        this.setDirtyCanvas(true);
-                        this.serialize_widgets();
-                        document.body.removeChild(dialog);
-                    };
-
-                    cancelButton.onclick = () => {
-                        document.body.removeChild(dialog);
-                    };
-                },
-
-                drawSelectionBox(ctx, text, x, y, maxWidth, totalHeight, align) {
-                    const padding = 10;
-                    
-                    let boxX = x;
-                    switch(align) {
-                        case "left":
-                            boxX = x + maxWidth/2;
-                            break;
-                        case "right":
-                            boxX = x - maxWidth/2;
-                            break;
-                    }
-
-                    ctx.strokeStyle = "rgba(80, 100, 255, 0.5)";
-                    ctx.lineWidth = 1;
-                    ctx.setLineDash([4, 4]);
-                    ctx.beginPath();
-                    ctx.roundRect(boxX - maxWidth/2 - padding, y - totalHeight/2 - padding, 
-                                maxWidth + padding*2, totalHeight + padding*2, 4);
-                    ctx.stroke();
-                    ctx.setLineDash([]);
-
-                    const points = [
-                        [boxX - maxWidth/2 - padding, y - totalHeight/2 - padding],
-                        [boxX + maxWidth/2 + padding, y - totalHeight/2 - padding],
-                        [boxX - maxWidth/2 - padding, y + totalHeight/2 + padding],
-                        [boxX + maxWidth/2 + padding, y + totalHeight/2 + padding]
-                    ];
-
-                    points.forEach(([px, py]) => {
-                        ctx.fillStyle = "#ffffff";
-                        ctx.beginPath();
-                        ctx.arc(px, py, 4, 0, Math.PI * 2);
-                        ctx.fill();
-                        ctx.strokeStyle = "rgba(80, 100, 255, 0.5)";
-                        ctx.lineWidth = 1.5;
-                        ctx.stroke();
-                    });
-
-                    return points;
-                },
-
-                isPointInRotatedRect(px, py, rectX, rectY, rectWidth, rectHeight, angle) {
-                    const s = Math.sin(-angle);
-                    const c = Math.cos(-angle);
-                    
-                    const dx = px - rectX;
-                    const dy = py - rectY;
-                    
-                    const rotatedX = dx * c - dy * s;
-                    const rotatedY = dx * s + dy * c;
-
-                    const halfWidth = rectWidth / 2;
-                    const halfHeight = rectHeight / 2;
-                    
-                    const tolerance = 10;
-                    
-                    const inXBounds = Math.abs(rotatedX) <= (halfWidth + tolerance);
-                    const inYBounds = Math.abs(rotatedY) <= (halfHeight + tolerance);
-                    
-                    const cornerTolerance = 15;
-                    const isInCorner = (Math.abs(rotatedX) > halfWidth - cornerTolerance && 
-                                       Math.abs(rotatedY) > halfHeight - cornerTolerance);
-                    
-                    return (inXBounds && inYBounds) || 
-                           (isInCorner && Math.abs(rotatedX) <= halfWidth + cornerTolerance && 
-                                         Math.abs(rotatedY) <= halfHeight + cornerTolerance);
+                    this._createSimpleSliderDialog("Rotation", "rotation", -180, 180, 1, "°");
                 },
 
                 onResize(size) {
-                    this.size[0] = Math.max(400, size[0]);
-                    this.size[1] = Math.max(300, size[1]);
+                    
+                    if (!this.uiState) {
+                        this.uiState = {
+                            text: "Enter Text",
+                            position: { x: 256, y: 256 },
+                            isCompact: true, 
+                            fontSize: 32,
+                            fontFamily: "Arial",
+                            textColor: "#ffffff",
+                            backgroundColor: "#000000",
+                            backgroundVisible: true,
+                            bold: false,
+                            italic: false,
+                            align: "center",
+                            rotation: 0,
+                            scale: { x: 1, y: 1 }
+                        };
+                    }
+
+                    
+                    this.size[0] = size[0];
+                    this.size[1] = size[1];
+                    
+                    
+                    this.uiState.customWidth = size[0];
+                    this.uiState.customHeight = size[1];
+                    
+                    this.uiState.hasCustomSize = true;
+                    
+                    
                     this.setDirtyCanvas(true);
                 },
 
                 onDragEnd() {
                     this.setDirtyCanvas(true);
-                },
-
-                getBoundingRect() {
-                    const canvas = this.graph?.canvas;
-                    if (!canvas) {
-                        return {
-                            x: window.innerWidth/2,
-                            y: window.innerHeight/2,
-                            width: this.size?.[0] || 400,
-                            height: this.size?.[1] || 300
-                        };
-                    }
-
-                    const transform = canvas.ds ? canvas.ds.scale : 1;
-                    const nodePos = this.pos || [window.innerWidth/2, window.innerHeight/2];
-                    const nodeSize = this.size || [400, 300];
-
-                    return {
-                        x: nodePos[0],
-                        y: nodePos[1],
-                        width: nodeSize[0] * transform,
-                        height: nodeSize[1] * transform
-                    };
-                },
-
-                onMouseLeave(e) {
-                    if (!this.isDragging) {
-                        this.uiState.isSelected = false;
-                        this.setDirtyCanvas(true);
-                    }
-                },
-
-                onPropertyChanged(property, value) {
-                    if (property === "position_x") {
-                        this.uiState.position.x = value;
-                        this.setDirtyCanvas(true);
-                    }
-                    else if (property === "position_y") {
-                        this.uiState.position.y = value;
-                        this.setDirtyCanvas(true);
-                    }
                 },
 
                 openFrameSizeDialog() {
@@ -1439,8 +1231,9 @@ app.registerExtension({
                     });
 
                     okButton.onclick = () => {
-                        const oldWidth = this.widgets_by_name.width.value;
-                        const oldHeight = this.widgets_by_name.height.value;
+                        
+                        const oldWidth = this.widgets_by_name.width?.value || 512;
+                        const oldHeight = this.widgets_by_name.height?.value || 512;
                         
                         const newWidth = parseInt(widthInput.value);
                         const newHeight = parseInt(heightInput.value);
@@ -1454,12 +1247,31 @@ app.registerExtension({
                         const newX = Math.round(currentX * widthRatio);
                         const newY = Math.round(currentY * heightRatio);
                         
-                        this.widgets_by_name.width.value = newWidth;
-                        this.widgets_by_name.height.value = newHeight;
-                        this.widgets_by_name.background_color.value = bgColorInput.value;
-                        this.widgets_by_name.background_visible.value = bgVisibleInput.checked;
-                        this.widgets_by_name.position_x.value = newX;
-                        this.widgets_by_name.position_y.value = newY;
+                        
+                        if (this.widgets_by_name.width) {
+                            this.widgets_by_name.width.value = newWidth;
+                        }
+                        
+                        if (this.widgets_by_name.height) {
+                            this.widgets_by_name.height.value = newHeight;
+                        }
+                        
+                        if (this.widgets_by_name.background_color) {
+                            this.widgets_by_name.background_color.value = bgColorInput.value;
+                        }
+                        
+                        if (this.widgets_by_name.background_visible) {
+                            this.widgets_by_name.background_visible.value = bgVisibleInput.checked;
+                        }
+                        
+                        if (this.widgets_by_name.position_x) {
+                            this.widgets_by_name.position_x.value = newX;
+                        }
+                        
+                        if (this.widgets_by_name.position_y) {
+                            this.widgets_by_name.position_y.value = newY;
+                        }
+                        
                         
                         this.uiState.canvasWidth = newWidth;
                         this.uiState.canvasHeight = newHeight;
@@ -1467,6 +1279,7 @@ app.registerExtension({
                         this.uiState.backgroundVisible = bgVisibleInput.checked;
                         this.uiState.position.x = newX;
                         this.uiState.position.y = newY;
+                        
                         
                         this.setDirtyCanvas(true);
                         this.serialize_widgets();
@@ -1575,19 +1388,34 @@ app.registerExtension({
                         
                         item.onclick = () => {
                             const selectedFont = item.querySelector('span').textContent;
-                            const currentBold = this.uiState.bold;
-                            const currentItalic = this.uiState.italic;
+                            
                             
                             this.uiState.fontFamily = selectedFont;
-                            this.widgets_by_name.font_family.value = selectedFont;
                             
+                            
+                            if (this.widgets_by_name.font_family) {
+                                const widget = this.widgets_by_name.font_family;
+                                widget.value = selectedFont;
+                                if (widget.callback) {
+                                    widget.callback(selectedFont);
+                                }
+                            }
+                            
+                            
+                            const currentBold = this.uiState.bold;
+                            const currentItalic = this.uiState.italic;
                             this.uiState.bold = currentBold;
                             this.uiState.italic = currentItalic;
                             this.widgets_by_name.is_bold.value = currentBold;
                             this.widgets_by_name.is_italic.value = currentItalic;
                             
-                            this.setDirtyCanvas(true);
+                            
                             this.serialize_widgets();
+                            if (this.onExecuted) {
+                                app.graph.runStep(this);
+                            }
+                            
+                            this.setDirtyCanvas(true);
                             document.body.removeChild(dialog);
                         };
                     });
@@ -1626,10 +1454,10 @@ app.registerExtension({
 
                     dialog.innerHTML = `
                         <div style="margin-bottom: 20px;">
-                            <h3 style="color: #fff; margin: 0 0 15px 0; font-size: 16px;">Gölge Ayarları</h3>
+                            <h3 style="color: #fff; margin: 0 0 15px 0; font-size: 16px;">Shadow Settings</h3>
                             
                             <div style="margin-bottom: 15px;">
-                                <label style="color: #ccc; display: block; margin-bottom: 5px;">Gölge Rengi:</label>
+                                <label style="color: #ccc; display: block; margin-bottom: 5px;">Shadow Color:</label>
                                 <div style="display: flex; align-items: center; gap: 10px;">
                                     <input type="color" id="shadowColor" value="${currentColor}"
                                            style="width: 50px; height: 30px; padding: 0; border: none; background: none;">
@@ -1639,12 +1467,11 @@ app.registerExtension({
                             </div>
 
                             <div style="margin-bottom: 15px;">
-                                <label style="color: #ccc; display: block; margin-bottom: 5px;">Bulanıklık:</label>
+                                <label style="color: #ccc; display: block; margin-bottom: 5px;">Blur:</label>
                                 <input type="range" id="shadowBlur" value="${currentBlur}" min="0" max="20" step="1"
                                        style="width: 100%; background: #2a2a2a;">
                                 <span id="shadowBlurValue" style="color: #fff; margin-left: 10px;">${currentBlur}px</span>
                             </div>
-
                             <div style="margin-bottom: 15px;">
                                 <label style="color: #ccc; display: block; margin-bottom: 5px;">X Offset:</label>
                                 <input type="range" id="shadowOffsetX" value="${currentOffsetX}" min="-20" max="20" step="1"
@@ -1750,12 +1577,31 @@ app.registerExtension({
                         outlineColor: this.uiState.outlineColor,
                         outlineWidth: this.uiState.outlineWidth,
                         reflectX: this.uiState.reflectX,
-                        reflectY: this.uiState.reflectY,
-                        isCompact: this.uiState.isCompact
+                        reflectY: this.uiState.reflectY
                     };
                 },
 
+
                 onConfigure(o) {
+                    
+                    if (!this.uiState) {
+                        this.uiState = {
+                            text: "Enter Text",
+                            position: { x: 256, y: 256 },
+                            isCompact: false,
+                            fontSize: 32,
+                            fontFamily: "Arial",
+                            textColor: "#ffffff",
+                            backgroundColor: "#000000",
+                            backgroundVisible: true,
+                            bold: false,
+                            italic: false,
+                            align: "center",
+                            rotation: 0,
+                            scale: { x: 1, y: 1 }
+                        };
+                    }
+                
                     if (o.uiState) {
                         this.uiState = {
                             text: o.uiState.text || "",
@@ -1783,16 +1629,23 @@ app.registerExtension({
                             outlineWidth: o.uiState.outlineWidth || 3,
                             reflectX: o.uiState.reflectX || false,
                             reflectY: o.uiState.reflectY || false,
-                            isCompact: o.uiState.isCompact || false,
                             hoveredButton: null
                         };
-                        
-                        if (this.uiState.isCompact) {
-                            this.size[1] = 300;
-                        } else {
-                            this.size[1] = 600;
-                        }
                     }
+                    
+                    
+                    if (o.size && Array.isArray(o.size) && o.size.length === 2) {
+                        this.size[0] = o.size[0];
+                        this.size[1] = o.size[1];
+                    }
+                    
+                    
+                    this.size[0] = Math.max(150, this.size[0]);
+                    
+                    
+                    this.setDirtyCanvas(true, true);
+                    
+                    this.serialize_widgets();
                 },
 
                 getCanvasImage() {
@@ -1808,7 +1661,7 @@ app.registerExtension({
                         
                         if (this.widgets_by_name.background_visible.value) {
                             ctx.fillStyle = this.uiState.backgroundColor;
-                            ctx.fillRect(0, 0, width, height);
+                    ctx.fillRect(0, 0, width, height);
                         }
 
                         let fontStyle = "";
@@ -1834,7 +1687,7 @@ app.registerExtension({
                         ctx.scale(this.uiState.scale.x, this.uiState.scale.y);
                         
                         ctx.textAlign = this.uiState.align;
-                        ctx.textBaseline = "middle";
+                    ctx.textBaseline = "middle";
                         
                         let alignOffsetX = 0;
                         const padding = 20;
@@ -1899,8 +1752,13 @@ app.registerExtension({
                                 const endY = centerY + dy * length / 2;
                                 
                                 const gradient = ctx.createLinearGradient(startX, startY, endX, endY);
-                                gradient.addColorStop(0, this.uiState.textGradient.start);
-                                gradient.addColorStop(1, this.uiState.textGradient.end);
+                                
+                                
+                                const startColor = this.uiState.textGradient.start || this.uiState.textColor;
+                                const endColor = this.uiState.textGradient.end || this.uiState.textColor;
+
+                                gradient.addColorStop(0, startColor);
+                                gradient.addColorStop(1, endColor);
                                 
                                 ctx.fillStyle = gradient;
                                 ctx.fillText(line, alignOffsetX, y);
@@ -1920,27 +1778,104 @@ app.registerExtension({
                     }
                 },
 
-                updateWidgets() {
-                    if (this.widgets_by_name.text) {
-                        const base64Image = this.getCanvasImage();
-                        this.widgets_by_name.canvas_image = { value: base64Image };
-                        
-                        this.serialize_widgets();
+                executeToolAction(actionName) {
+                    switch(actionName) {
+                        case 'editText':
+                            const currentText = this.widgets_by_name.text?.value || this.uiState.text || "";
+                            const newText = prompt("Enter text:", currentText);
+                            if (newText !== null) {
+                                if (this.widgets_by_name.text) {
+                                    this.widgets_by_name.text.value = newText;
+                                    this.uiState.text = newText;
+                                }
+                                this.setDirtyCanvas(true);
+                                this.serialize_widgets();
+                            }
+                            break;
+                        case 'openMoveDialog': this.openMoveDialog(); break;
+                        case 'alignLeft': this.updateToolbarButton('align', 'left'); break;
+                        case 'alignCenter': this.updateToolbarButton('align', 'center'); break;
+                        case 'alignRight': this.updateToolbarButton('align', 'right'); break;
+                        case 'toggleBold': this.updateToolbarButton('bold', !this.uiState.bold); break;
+                        case 'toggleItalic': this.updateToolbarButton('italic', !this.uiState.italic); break;
+                        case 'openFontSizeDialog': this.openFontSizeDialog(); break;
+                        case 'openFontDialog': this.openFontDialog(); break;
+                        case 'openColorDialog': this.openColorDialog(); break;
+                        case 'openShadowDialog': this.openShadowDialog(); break;
+                        case 'openOutlineDialog': this.openOutlineDialog(); break;
+                        case 'openRotationDialog': this.openRotationDialog(); break;
+                        case 'reflectX':
+                            this.uiState.reflectX = !this.uiState.reflectX;
+                            this.uiState.scale.x *= -1;
+                            if (this.widgets_by_name && this.widgets_by_name.reflect_x) {
+                                this.widgets_by_name.reflect_x.value = this.uiState.reflectX;
+                            }
+                            this.setDirtyCanvas(true);
+                            this.serialize_widgets();
+                            break;
+                        case 'reflectY':
+                            this.uiState.reflectY = !this.uiState.reflectY;
+                            this.uiState.scale.y *= -1;
+                            if (this.widgets_by_name && this.widgets_by_name.reflect_y) {
+                                this.widgets_by_name.reflect_y.value = this.uiState.reflectY;
+                            }
+                            this.setDirtyCanvas(true);
+                            this.serialize_widgets();
+                            break;
+                        case 'openFrameSizeDialog': this.openFrameSizeDialog(); break;
+                        default:
+                            console.warn("Unknown tool action:", actionName);
                     }
                 },
 
+                getExtraMenuOptions(_, options) {
+                    options.unshift({
+                        content: "Swap width/height",
+                        callback: () => {
+                            const oldWidth = this.widgets_by_name.width?.value || 512;
+                            const oldHeight = this.widgets_by_name.height?.value || 512;
+                            
+                            if (this.widgets_by_name.width) {
+                                this.widgets_by_name.width.value = oldHeight;
+                            }
+                            
+                            if (this.widgets_by_name.height) {
+                                this.widgets_by_name.height.value = oldWidth;
+                            }
+                            
+                            const currentX = this.uiState.position.x;
+                            const currentY = this.uiState.position.y;
+                            
+                            const widthRatio = oldHeight / oldWidth;
+                            const heightRatio = oldWidth / oldHeight;
+                            
+                            if (this.widgets_by_name.position_x) {
+                                this.widgets_by_name.position_x.value = Math.round(currentX * widthRatio);
+                            }
+                            
+                            if (this.widgets_by_name.position_y) {
+                                this.widgets_by_name.position_y.value = Math.round(currentY * heightRatio);
+                            }
+                            
+                            this.uiState.canvasWidth = oldHeight;
+                            this.uiState.canvasHeight = oldWidth;
+                            this.uiState.position.x = Math.round(currentX * widthRatio);
+                            this.uiState.position.y = Math.round(currentY * heightRatio);
+                            
+                            this.setDirtyCanvas(true);
+                            this.serialize_widgets();
+                        }
+                    });
+                    return options;
+                },
+
                 openMoveDialog() {
-                    const dialog = document.createElement("div");
-                    dialog.id = `textbox-dialog-${this.id}`;
-                    dialog.className = "skb-textbox-dialog";
-                    
                     const canvasWidth = this.widgets_by_name.width.value;
                     const canvasHeight = this.widgets_by_name.height.value;
                     const currentX = this.uiState.position.x;
                     const currentY = this.uiState.position.y;
 
-                    dialog.innerHTML = `
-                        <h3 style="color: #fff; margin: 0 0 15px 0; font-size: 16px;">Position Settings</h3>
+                    const contentHTML = `
                         <div class="skb-textbox-position-canvas">
                             <canvas id="positionCanvas" width="360" height="360"></canvas>
                             <div id="positionHandle" class="skb-textbox-handle">
@@ -1961,142 +1896,126 @@ app.registerExtension({
                             <button id="centerPos">Center</button>
                             <button id="resetPos">Reset</button>
                         </div>
-                        <div class="skb-textbox-button-group">
-                            <button id="cancel" class="secondary">Cancel</button>
-                            <button id="ok" class="primary">OK</button>
-                        </div>
+                        
                     `;
 
-                    document.body.appendChild(dialog);
+                    const onSetup = (dialog) => {
+                        const canvas = dialog.querySelector("#positionCanvas");
+                        const ctx = canvas.getContext("2d");
+                        const handle = dialog.querySelector("#positionHandle");
+                        const posXInput = dialog.querySelector("#posX");
+                        const posYInput = dialog.querySelector("#posY");
 
-                    const canvas = dialog.querySelector("#positionCanvas");
-                    const ctx = canvas.getContext("2d");
-                    const handle = dialog.querySelector("#positionHandle");
-                    const posXInput = dialog.querySelector("#posX");
-                    const posYInput = dialog.querySelector("#posY");
-
-                    function drawGrid() {
-                        ctx.clearRect(0, 0, 360, 360);
-                        
-                        ctx.strokeStyle = "rgba(255,255,255,0.1)";
-                        ctx.lineWidth = 1;
-                        
-                        for(let i = 0; i <= 360; i += 36) {
+                        function drawGrid() {
+                            ctx.clearRect(0, 0, 360, 360);
+                            ctx.strokeStyle = "rgba(255,255,255,0.1)";
+                            ctx.lineWidth = 1;
+                            for(let i = 0; i <= 360; i += 36) {
+                                ctx.beginPath();
+                                ctx.moveTo(i, 0); ctx.lineTo(i, 360);
+                                ctx.moveTo(0, i); ctx.lineTo(360, i);
+                                ctx.stroke();
+                            }
+                            ctx.strokeStyle = "rgba(255,255,255,0.3)";
+                            ctx.setLineDash([5, 5]);
                             ctx.beginPath();
-                            ctx.moveTo(i, 0);
-                            ctx.lineTo(i, 360);
-                            ctx.moveTo(0, i);
-                            ctx.lineTo(360, i);
+                            ctx.moveTo(180, 0); ctx.lineTo(180, 360);
+                            ctx.moveTo(0, 180); ctx.lineTo(360, 180);
                             ctx.stroke();
+                            ctx.setLineDash([]);
                         }
 
-                        ctx.strokeStyle = "rgba(255,255,255,0.3)";
-                        ctx.setLineDash([5, 5]);
-                        ctx.beginPath();
-                        ctx.moveTo(180, 0);
-                        ctx.lineTo(180, 360);
-                        ctx.moveTo(0, 180);
-                        ctx.lineTo(360, 180);
-                        ctx.stroke();
-                        ctx.setLineDash([]);
-                    }
+                        function updateHandlePosition(x, y) {
+                            const scaleX = 360 / canvasWidth;
+                            const scaleY = 360 / canvasHeight;
+                            const clampedX = Math.max(0, Math.min(canvasWidth, x));
+                            const clampedY = Math.max(0, Math.min(canvasHeight, y));
+                            handle.style.left = `${clampedX * scaleX}px`;
+                            handle.style.top = `${clampedY * scaleY}px`;
+                            posXInput.value = Math.round(clampedX);
+                            posYInput.value = Math.round(clampedY);
+                            
+                        }
 
-                    function updateHandlePosition(x, y) {
-                        const scaleX = 360 / canvasWidth;
-                        const scaleY = 360 / canvasHeight;
-                        
-                        const padding = 20;
-                        const minX = padding;
-                        const minY = padding;
-                        const maxX = canvasWidth - padding;
-                        const maxY = canvasHeight - padding;
-                        
-                        const clampedX = Math.max(minX, Math.min(maxX, x));
-                        const clampedY = Math.max(minY, Math.min(maxY, y));
-                        
-                        handle.style.left = `${clampedX * scaleX}px`;
-                        handle.style.top = `${clampedY * scaleY}px`;
-                        posXInput.value = Math.round(clampedX);
-                        posYInput.value = Math.round(clampedY);
-                        
                         drawGrid();
-                    }
+                        updateHandlePosition(currentX, currentY);
 
-                    drawGrid();
-                    updateHandlePosition(currentX, currentY);
+                        let isDragging = false;
+                        let mouseMoveHandler, mouseUpHandler;
 
-                    let isDragging = false;
-                    
-                    handle.addEventListener("mousedown", () => isDragging = true);
-                    
-                    document.addEventListener("mousemove", (e) => {
-                        if (!isDragging) return;
-                        
-                        const rect = canvas.getBoundingClientRect();
-                        const scaleX = canvasWidth / 360;
-                        const scaleY = canvasHeight / 360;
-                        
-                        const x = (e.clientX - rect.left) * scaleX;
-                        const y = (e.clientY - rect.top) * scaleY;
-                        
-                        updateHandlePosition(x, y);
-                    });
-                    
-                    document.addEventListener("mouseup", () => isDragging = false);
+                        handle.addEventListener("mousedown", () => {
+                           isDragging = true;
+                           handle.style.cursor = 'grabbing';
+                           document.addEventListener("mousemove", mouseMoveHandler = (e) => {
+                               if (!isDragging) return;
+                               const rect = canvas.getBoundingClientRect();
+                               const scaleX = canvasWidth / 360;
+                               const scaleY = canvasHeight / 360;
+                               const x = (e.clientX - rect.left) * scaleX;
+                               const y = (e.clientY - rect.top) * scaleY;
+                               updateHandlePosition(x, y);
+                           });
+                           document.addEventListener("mouseup", mouseUpHandler = () => {
+                               isDragging = false;
+                               handle.style.cursor = 'grab';
+                               document.removeEventListener("mousemove", mouseMoveHandler);
+                               document.removeEventListener("mouseup", mouseUpHandler);
+                           });
+                        });
 
-                    posXInput.addEventListener("change", () => {
-                        const x = Math.max(0, Math.min(canvasWidth, parseInt(posXInput.value) || 0));
-                        const y = parseInt(posYInput.value) || 0;
-                        updateHandlePosition(x, y);
-                    });
+                        posXInput.addEventListener("change", () => {
+                            const x = Math.max(0, Math.min(canvasWidth, parseInt(posXInput.value) || 0));
+                            const y = parseInt(posYInput.value) || 0;
+                            updateHandlePosition(x, y);
+                        });
+                        posYInput.addEventListener("change", () => {
+                            const x = parseInt(posXInput.value) || 0;
+                            const y = Math.max(0, Math.min(canvasHeight, parseInt(posYInput.value) || 0));
+                            updateHandlePosition(x, y);
+                        });
 
-                    posYInput.addEventListener("change", () => {
-                        const x = parseInt(posXInput.value) || 0;
-                        const y = Math.max(0, Math.min(canvasHeight, parseInt(posYInput.value) || 0));
-                        updateHandlePosition(x, y);
-                    });
+                        dialog.querySelector("#centerPos").onclick = () => updateHandlePosition(canvasWidth / 2, canvasHeight / 2);
+                        dialog.querySelector("#resetPos").onclick = () => updateHandlePosition(canvasWidth * 0.5, canvasHeight * 0.5); 
 
-                    dialog.querySelector("#centerPos").onclick = () => updateHandlePosition(canvasWidth/2, canvasHeight/2);
-                    dialog.querySelector("#resetPos").onclick = () => updateHandlePosition(0, 0);
-                    
-                    dialog.querySelector("#ok").onclick = () => {
-                        const x = parseInt(posXInput.value) || 0;
-                        const y = parseInt(posYInput.value) || 0;
                         
-                        this.uiState.position.x = x;
-                        this.uiState.position.y = y;
-                        this.widgets_by_name.position_x.value = x;
-                        this.widgets_by_name.position_y.value = y;
-                        
-                        this.setDirtyCanvas(true);
-                        this.serialize_widgets();
-                        document.body.removeChild(dialog);
+                        const originalOkOnclick = dialog.querySelector(".skb-dialog-ok").onclick;
+                        dialog.querySelector(".skb-dialog-ok").onclick = (...args) => {
+                            document.removeEventListener("mousemove", mouseMoveHandler);
+                            document.removeEventListener("mouseup", mouseUpHandler);
+                            if(originalOkOnclick) originalOkOnclick(...args);
+                        };
+                         const originalCancelOnclick = dialog.querySelector(".skb-dialog-cancel").onclick;
+                         dialog.querySelector(".skb-dialog-cancel").onclick = (...args) => {
+                             document.removeEventListener("mousemove", mouseMoveHandler);
+                             document.removeEventListener("mouseup", mouseUpHandler);
+                             if(originalCancelOnclick) originalCancelOnclick(...args);
+                         };
                     };
 
-                    dialog.querySelector("#cancel").onclick = () => document.body.removeChild(dialog);
+                    const onOk = (dialog) => {
+                        const posXInput = dialog.querySelector("#posX");
+                        const posYInput = dialog.querySelector("#posY");
+                        const x = parseInt(posXInput.value) || 0;
+                        const y = parseInt(posYInput.value) || 0;
+                        this.uiState.position.x = x;
+                        this.uiState.position.y = y;
+                        if (this.widgets_by_name.position_x) this.widgets_by_name.position_x.value = x;
+                        if (this.widgets_by_name.position_y) this.widgets_by_name.position_y.value = y;
+                        this.setDirtyCanvas(true);
+                        this.serialize_widgets();
+                    };
+
+                    this._createDialog("Position Settings", contentHTML, onSetup, onOk);
                 },
 
                 openColorDialog() {
-                    const dialog = document.createElement("div");
-                    dialog.style.cssText = `
-                        position: fixed;
-                        left: 50%;
-                        top: 50%;
-                        transform: translate(-50%, -50%);
-                        background: #1e1e1e;
-                        border: 1px solid #4a9eff;
-                        padding: 20px;
-                        border-radius: 4px;
-                        z-index: 10000;
-                        min-width: 300px;
-                    `;
-
                     const presetColors = [
                         "#FFFFFF", "#000000", "#FF0000", "#00FF00", "#0000FF",
                         "#FFFF00", "#FF00FF", "#00FFFF", "#FFA500", "#800080"
                     ];
 
-                    dialog.innerHTML = `
+                    
+                    const contentHTML = `
                         <div style="margin-bottom: 20px;">
                             <h3 style="color: #fff; margin: 0 0 15px 0; font-size: 16px;">Text Color Settings</h3>
                             
@@ -2243,128 +2162,154 @@ app.registerExtension({
                                 </div>
                             </div>
                         </div>
-                        
-                        <div style="text-align: right; border-top: 1px solid #333; padding-top: 15px;">
-                            <button id="cancel" style="margin-right: 10px; padding: 6px 15px; background: #333; color: #fff; border: none; border-radius: 3px; cursor: pointer;">Cancel</button>
-                            <button id="ok" style="padding: 6px 15px; background: #4a9eff; color: #fff; border: none; border-radius: 3px; cursor: pointer;">OK</button>
-                        </div>
                     `;
+                    
+                    
+                    const onSetup = (dialog) => {
+                        const textColorInput = dialog.querySelector("#textColor");
+                        const textColorText = dialog.querySelector("#textColorText");
+                        const gradientToggle = dialog.querySelector("#gradientToggle");
+                        const gradientControls = dialog.querySelector("#gradientControls");
+                        const gradientStartInput = dialog.querySelector("#gradientStart");
+                        const gradientStartText = dialog.querySelector("#gradientStartText");
+                        const gradientEndInput = dialog.querySelector("#gradientEnd");
+                        const gradientEndText = dialog.querySelector("#gradientEndText");
+                        const gradientAngle = dialog.querySelector("#gradientAngle");
+                        const gradientAngleText = dialog.querySelector("#gradientAngleText");
+                        const gradientPreview = dialog.querySelector("#gradientPreview");
 
-                    document.body.appendChild(dialog);
-
-                    const textColorInput = dialog.querySelector("#textColor");
-                    const textColorText = dialog.querySelector("#textColorText");
-                    const gradientToggle = dialog.querySelector("#gradientToggle");
-                    const gradientControls = dialog.querySelector("#gradientControls");
-                    const gradientStartInput = dialog.querySelector("#gradientStart");
-                    const gradientStartText = dialog.querySelector("#gradientStartText");
-                    const gradientEndInput = dialog.querySelector("#gradientEnd");
-                    const gradientEndText = dialog.querySelector("#gradientEndText");
-                    const gradientAngle = dialog.querySelector("#gradientAngle");
-                    const gradientAngleText = dialog.querySelector("#gradientAngleText");
-                    const gradientPreview = dialog.querySelector("#gradientPreview");
-                    const okButton = dialog.querySelector("#ok");
-                    const cancelButton = dialog.querySelector("#cancel");
-
-                    function updatePreview() {
-                        if (gradientToggle.checked) {
-                            this.uiState.textGradient = {
-                                start: gradientStartInput.value,
-                                end: gradientEndInput.value,
-                                angle: parseInt(gradientAngle.value)
-                            };
-                            this.widgets_by_name.text_gradient_start.value = gradientStartInput.value;
-                            this.widgets_by_name.text_gradient_end.value = gradientEndInput.value;
-                            this.widgets_by_name.text_gradient_angle.value = parseInt(gradientAngle.value);
-                        } else {
-                            this.uiState.textGradient = null;
-                            this.widgets_by_name.text_gradient_start.value = "";
-                            this.widgets_by_name.text_gradient_end.value = "";
-                            this.widgets_by_name.text_gradient_angle.value = 0;
-                            this.uiState.textColor = textColorInput.value;
-                            this.widgets_by_name.text_color.value = textColorInput.value;
+                        function updatePreview() {
+                            if (gradientToggle.checked) {
+                                this.uiState.textGradient = {
+                                    start: gradientStartInput.value,
+                                    end: gradientEndInput.value,
+                                    angle: parseInt(gradientAngle.value)
+                                };
+                                if (this.widgets_by_name.text_gradient_start) this.widgets_by_name.text_gradient_start.value = gradientStartInput.value;
+                                if (this.widgets_by_name.text_gradient_end) this.widgets_by_name.text_gradient_end.value = gradientEndInput.value;
+                                if (this.widgets_by_name.text_gradient_angle) this.widgets_by_name.text_gradient_angle.value = parseInt(gradientAngle.value);
+                            } else {
+                                this.uiState.textGradient = null;
+                                if (this.widgets_by_name.text_gradient_start) this.widgets_by_name.text_gradient_start.value = "";
+                                if (this.widgets_by_name.text_gradient_end) this.widgets_by_name.text_gradient_end.value = "";
+                                if (this.widgets_by_name.text_gradient_angle) this.widgets_by_name.text_gradient_angle.value = 0;
+                                
+                                this.uiState.textColor = textColorInput.value;
+                                if (this.widgets_by_name.text_color) this.widgets_by_name.text_color.value = textColorInput.value;
+                            }
+                            this.setDirtyCanvas(true);
                         }
-                        this.setDirtyCanvas(true);
-                    }
 
-                    function updateGradientPreview() {
-                        gradientPreview.style.background = `linear-gradient(${gradientAngle.value}deg, ${gradientStartInput.value}, ${gradientEndInput.value})`;
-                        updatePreview.call(this);
-                    }
+                        function updateGradientPreview() {
+                            gradientPreview.style.background = `linear-gradient(${gradientAngle.value}deg, ${gradientStartInput.value}, ${gradientEndInput.value})`;
+                            updatePreview.call(this); 
+                        }
 
-                    dialog.querySelectorAll('.color-preset').forEach(preset => {
-                        preset.onclick = () => {
-                            const color = preset.dataset.color;
-                            textColorInput.value = color;
-                            textColorText.value = color;
-                            dialog.querySelectorAll('.color-preset').forEach(p => p.innerHTML = '');
-                            preset.innerHTML = `
-                                <div style="
-                                    position: absolute;
-                                    top: 50%;
-                                    left: 50%;
-                                    transform: translate(-50%, -50%);
-                                    width: 16px;
-                                    height: 16px;
-                                    border: 2px solid ${color === '#FFFFFF' ? '#000' : '#fff'};
-                                    border-radius: 50%;
-                                "></div>
-                            `;
+                        dialog.querySelectorAll('.color-preset').forEach(preset => {
+                            preset.onclick = () => {
+                                const color = preset.dataset.color;
+                                textColorInput.value = color;
+                                textColorText.value = color;
+                                dialog.querySelectorAll('.color-preset').forEach(p => p.innerHTML = '');
+                                preset.innerHTML = `
+                                    <div style="
+                                        position: absolute;
+                                        top: 50%;
+                                        left: 50%;
+                                        transform: translate(-50%, -50%);
+                                        width: 16px;
+                                        height: 16px;
+                                        border: 2px solid ${color === '#FFFFFF' ? '#000' : '#fff'};
+                                        border-radius: 50%;
+                                    "></div>
+                                `;
+                                
+                                gradientToggle.checked = false;
+                                gradientToggle.dispatchEvent(new Event('change')); 
+                                updatePreview.call(this);
+                            };
+                        });
+
+                        gradientToggle.onchange = () => {
+                            const isChecked = gradientToggle.checked;
+                            gradientControls.style.opacity = isChecked ? '1' : '0.5';
+                            gradientControls.style.pointerEvents = isChecked ? 'all' : 'none';
+                            gradientToggle.nextElementSibling.lastElementChild.style.transform = 
+                                isChecked ? 'translateX(22px)' : 'translateX(0)';
                             updatePreview.call(this);
                         };
-                    });
+                        
+                        const updateColorInput = (input, text) => {
+                            text.value = input.value;
+                            updatePreview.call(this);
+                        };
 
-                    gradientToggle.onchange = () => {
+                        const updateColorText = (text, input) => {
+                            if (/^#[0-9A-F]{6}$/i.test(text.value)) {
+                                input.value = text.value;
+                                updatePreview.call(this);
+                            }
+                        };
+
+                        textColorInput.oninput = () => updateColorInput(textColorInput, textColorText);
+                        textColorText.oninput = () => updateColorText(textColorText, textColorInput);
+                        gradientStartInput.oninput = () => updateColorInput(gradientStartInput, gradientStartText);
+                        gradientStartText.oninput = () => updateColorText(gradientStartText, gradientStartInput);
+                        gradientEndInput.oninput = () => updateColorInput(gradientEndInput, gradientEndText);
+                        gradientEndText.oninput = () => updateColorText(gradientEndText, gradientEndInput);
+
+                        gradientAngle.oninput = () => {
+                            gradientAngleText.value = gradientAngle.value;
+                            updateGradientPreview.call(this); 
+                        };
+
+                        gradientAngleText.onchange = () => {
+                            let value = parseInt(gradientAngleText.value) || 0;
+                            value = Math.max(0, Math.min(360, value));
+                            gradientAngleText.value = value;
+                            gradientAngle.value = value;
+                            updateGradientPreview.call(this);
+                        };
+                        
+                        
                         gradientControls.style.opacity = gradientToggle.checked ? '1' : '0.5';
                         gradientControls.style.pointerEvents = gradientToggle.checked ? 'all' : 'none';
                         gradientToggle.nextElementSibling.lastElementChild.style.transform = 
                             gradientToggle.checked ? 'translateX(22px)' : 'translateX(0)';
-                        updatePreview.call(this);
                     };
 
-                    const updateColorInput = (input, text) => {
-                        text.value = input.value;
-                        updatePreview.call(this);
+                    
+                    const onOk = (dialog) => {
+                        
+                        this.serialize_widgets(); 
                     };
 
-                    const updateColorText = (text, input) => {
-                        if (/^#[0-9A-F]{6}$/i.test(text.value)) {
-                            input.value = text.value;
-                            updatePreview.call(this);
-                        }
-                    };
+                    
+                    this._createDialog("Color Settings", contentHTML, onSetup, onOk);
+                },
 
-                    textColorInput.oninput = () => updateColorInput(textColorInput, textColorText);
-                    textColorText.oninput = () => updateColorText(textColorText, textColorInput);
-                    gradientStartInput.oninput = () => updateColorInput(gradientStartInput, gradientStartText);
-                    gradientStartText.oninput = () => updateColorText(gradientStartText, gradientStartInput);
-                    gradientEndInput.oninput = () => updateColorInput(gradientEndInput, gradientEndText);
-                    gradientEndText.oninput = () => updateColorText(gradientEndText, gradientEndInput);
+                
+                renderFallbackIcon(ctx, tool, x, y, size, color) {
+                    ctx.fillStyle = color;
+                    ctx.font = `bold ${size * 0.8}px Arial`;
+                    ctx.textAlign = "center";
+                    ctx.textBaseline = "middle";
+                    let fallbackChar = "?";
+                    if (tool.action === 'editText') fallbackChar = "T";
+                    else if (tool.action === 'toggleBold') fallbackChar = "B";
+                    else if (tool.action === 'toggleItalic') fallbackChar = "I";
+                    else if (tool.action.includes('align')) fallbackChar = "A";
+                    else if (tool.action.includes('Color')) fallbackChar = "C";
+                    else if (tool.action.includes('Font')) fallbackChar = "F";
+                    else if (tool.action === 'openMoveDialog') fallbackChar = "+";
+                    else if (tool.action === 'openFrameSizeDialog') fallbackChar = "□";
 
-                    gradientAngle.oninput = () => {
-                        gradientAngleText.value = gradientAngle.value;
-                        updateGradientPreview.call(this);
-                    };
-
-                    gradientAngleText.onchange = () => {
-                        let value = parseInt(gradientAngleText.value) || 0;
-                        value = Math.max(0, Math.min(360, value));
-                        gradientAngleText.value = value;
-                        gradientAngle.value = value;
-                        updateGradientPreview.call(this);
-                    };
-
-                    okButton.onclick = () => {
-                        updatePreview.call(this);
-                        this.serialize_widgets();
-                        document.body.removeChild(dialog);
-                    };
-
-                    cancelButton.onclick = () => {
-                        document.body.removeChild(dialog);
-                    };
+                    ctx.fillText(fallbackChar, x + size / 2, y + size / 2);
                 }
             });
         }
     }
 });
+
+
+

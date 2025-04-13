@@ -30,9 +30,9 @@ class AspectRatioAdvanced:
     CATEGORY = "SKB/display"
 
     def calculate_dimensions(self, category, subcategory, width, height, swap_dimensions, upscale_factor, round_to_64):
-        print("\n--- Calculate Dimensions Başladı ---")
-        print(f"Gelen parametreler: category={category}, subcategory={subcategory}")
-        print(f"Başlangıç boyutları: width={width}, height={height}")
+        print("\n--- Calculate Dimensions Started ---")
+        print(f"Incoming parameters: category={category}, subcategory={subcategory}")
+        print(f"Initial dimensions: width={width}, height={height}")
         print(f"swap_dimensions={swap_dimensions}, round_to_64={round_to_64}")
         print(f"upscale_factor={upscale_factor}")
 
@@ -42,7 +42,6 @@ class AspectRatioAdvanced:
         if upscale_factor <= 0:
             raise ValueError("Upscale factor must be positive")
 
-        # Upscale factor'ü 2 ondalık basamağa yuvarla
         upscale_factor = round(upscale_factor, 2)
 
         dimensions = {
@@ -60,7 +59,6 @@ class AspectRatioAdvanced:
             "1:1 - 1080x1080": (1080, 1080)
         }
 
-        # Önce preset veya flux boyutlarını al
         if category == "Flux" and subcategory:
             try:
                 dimensions_part = subcategory.split(" - ")[1]
@@ -72,26 +70,22 @@ class AspectRatioAdvanced:
         elif category != "Custom" and subcategory in dimensions:
             width, height = dimensions[subcategory]
 
-        # Swap işlemi
         if swap_dimensions:
             width, height = height, width
 
-        # 64'e yuvarlama işlemi - upscale'den ÖNCE
         if round_to_64:
             width = math.ceil(width / 64.0) * 64
             height = math.ceil(height / 64.0) * 64
 
-        # Upscale işlemi - en son yapılacak
         width = int(round(width * upscale_factor))
         height = int(round(height * upscale_factor))
 
-        # Minimum boyut kontrolü
         width = max(32, int(width))
         height = max(32, int(height))
 
-        print(f"Final boyutlar: width={width}, height={height}")
+        print(f"Final dimensions: width={width}, height={height}")
             
-        print("--- Calculate Dimensions Tamamlandı ---\n")
+        print("--- Calculate Dimensions Completed ---\n")
         return (int(width), int(height), upscale_factor)
 
 NODE_CLASS_MAPPINGS = {
