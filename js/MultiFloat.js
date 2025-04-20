@@ -71,6 +71,8 @@ class MultiFloatNode {
         this.node.widgets = [];
         
         this.node.onDrawForeground = this.onDrawForeground.bind(this);
+
+        this.node.serialize_widgets = true;
     }
 
     updateValue(index, value) {

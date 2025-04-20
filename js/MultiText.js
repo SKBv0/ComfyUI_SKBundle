@@ -7,16 +7,12 @@ import {
     injectDialogCSS,
     DialogUtils
 } from "./MultiTextDefaults.js";
-
 const THEME = {
     ...defaultThemeConfig, 
     promptPresets: defaultPresets, 
     promptTemplates: defaultTemplates, 
 };
-
-
 injectDialogCSS(THEME);
-
 const fontStyles = document.createElement('style');
 fontStyles.textContent = `
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
@@ -25,7 +21,6 @@ fontStyles.textContent = `
     }
 `;
 document.head.appendChild(fontStyles);
-
 const Utils = {
     drawRoundedRect(ctx, x, y, w, h, r = 4, options = { fill: true, stroke: false, lineWidth: 1 }) {
         ctx.beginPath();
@@ -40,18 +35,15 @@ const Utils = {
         if (!text) return '';
         const width = ctx.measureText(text).width;
         if (width <= maxWidth) return text;
-        
         const ellipsis = '...';
         const ellipsisWidth = ctx.measureText(ellipsis).width;
         let low = 0;
         let high = text.length;
         let best = 0;
-        
         while (low <= high) {
             const mid = (low + high) >>> 1;
             const slice = text.slice(0, mid);
             const width = ctx.measureText(slice).width + ellipsisWidth;
-            
             if (width <= maxWidth) {
                 best = mid;
                 low = mid + 1;
@@ -65,40 +57,28 @@ const Utils = {
 const UXUtils = {
     drawTooltip(ctx, text, x, y) {
         if (!text) return;
-        
         const padding = 8;
         const fontSize = 12;
         ctx.save();
-        
-        
         ctx.font = `${fontSize}px ${THEME.typography.fonts.primary}`;
         ctx.textBaseline = "middle";
         ctx.textAlign = "left";
-        
-        
         const metrics = ctx.measureText(text);
         const tooltipWidth = metrics.width + (padding * 2);
         const tooltipHeight = fontSize + (padding * 2);
-        
-        
         let tooltipX = Math.max(8, Math.min(x, ctx.canvas.width - tooltipWidth - 8));
         let tooltipY = y - tooltipHeight - 8;
         if (tooltipY < 8) {
             tooltipY = y + 24;
         }
-        
-        
         ctx.fillStyle = THEME.colors.bgActive;
         ctx.shadowColor = "rgba(0,0,0,0.2)";
         ctx.shadowBlur = 8;
         ctx.shadowOffsetY = 2;
         Utils.drawRoundedRect(ctx, tooltipX, tooltipY, tooltipWidth, tooltipHeight, 4);
-        
-        
         ctx.shadowColor = "transparent";
         ctx.fillStyle = THEME.colors.text;
         ctx.fillText(text, tooltipX + padding, tooltipY + (tooltipHeight / 2));
-        
         ctx.restore();
     }
 };
@@ -135,8 +115,6 @@ const Renderer = {
         ctx.fillText(weightValue.toFixed(1), weightX + 50, weightY + 3);
         ctx.textAlign = "left";
     },
-
-
 };
 const MultiTextNode = {
     onNodeCreated() {
@@ -144,60 +122,42 @@ const MultiTextNode = {
             this.htmlElement.classList.add('multitext-node');
         }
         this.setupWidgets();
-        
-        
         this.activePrompts = parseInt(localStorage.getItem('multitext_prompt_count')) || 2;
         this.maxPrompts = 20;
         this.isSinglePromptMode = localStorage.getItem('multitext_single_prompt') === "true";
         this.tooltipState = { visible: false, text: '', x: 0, y: 0 };
         this.currentHoverIndex = -1;
-        
-        
         this.applyPromptMode();
         this.updateNodeSize();
         this.loadFonts();
         this.loadSavedTemplates();
         this.loadSavedPresets();
     },
-    
     loadSavedTemplates() {
         try {
             const savedTemplates = localStorage.getItem('multitext_templates');
             if (savedTemplates) {
                 const parsedTemplates = JSON.parse(savedTemplates);
-                
-                
                 Object.entries(parsedTemplates).forEach(([category, categoryData]) => {
                     if (THEME.promptTemplates[category]) {
-                        
                         THEME.promptTemplates[category].icon = categoryData.icon || THEME.promptTemplates[category].icon;
                         THEME.promptTemplates[category].label = categoryData.label || THEME.promptTemplates[category].label;
-                        
-                        
                         if (Array.isArray(categoryData.templates)) {
-                            
                             const defaultTemplates = THEME.promptTemplates[category].templates || [];
                             const defaultTemplateNames = defaultTemplates.map(t => t.name);
-                            
-                            
                             const filteredDefaults = defaultTemplates.filter(template => 
                                 !categoryData.templates.some(t => t.name === template.name)
                             );
-                            
-                            
                             const customTemplates = categoryData.templates.map(template => ({
                                 ...template,
                                 isCustom: true
                             }));
-                            
-                            
                             THEME.promptTemplates[category].templates = [
                                 ...filteredDefaults,
                                 ...customTemplates
                             ];
                         }
                     } else {
-                        
                         THEME.promptTemplates[category] = {
                             ...categoryData,
                             templates: Array.isArray(categoryData.templates) 
@@ -209,32 +169,24 @@ const MultiTextNode = {
                         };
                     }
                 });
-                
                 console.log('Custom templates loaded successfully');
             }
         } catch (error) {
             console.error('Error loading saved templates:', error);
         }
     },
-    
     loadSavedPresets() {
         try {
             const savedPresets = localStorage.getItem('multitext_category_presets');
             if (savedPresets) {
                 const parsedPresets = JSON.parse(savedPresets);
-                
                 Object.entries(parsedPresets).forEach(([category, categoryData]) => {
                     if (THEME.promptPresets[category] && Array.isArray(categoryData.presets)) {
-                        
                         const defaultCategoryPresets = THEME.promptPresets[category].presets || [];
                         const defaultPresetLabels = defaultCategoryPresets.map(p => p.label);
-
-                        
                         const customPresets = categoryData.presets.filter(
                             saved => !defaultPresetLabels.includes(saved.label)
                         ).map(p => ({ ...p, isCustom: true }));
-
-                        
                         THEME.promptPresets[category].presets = [
                             ...defaultCategoryPresets,
                             ...customPresets
@@ -247,7 +199,6 @@ const MultiTextNode = {
             console.error('Error loading saved presets:', error);
         }
     },
-    
     _createPromptWidgets(index) {
         const textWidget = ComfyWidgets["STRING"](this, `text${index}`, ["STRING", { 
             multiline: true,
@@ -272,39 +223,19 @@ const MultiTextNode = {
             ["BOOLEAN", { default: true, visible: false }],
             app
         );
-
         [textWidget, weightWidget, labelWidget, enabledWidget].forEach(widgetData => {
             if (widgetData?.widget) {
                 widgetData.widget.computeSize = () => [0, -4];
                 widgetData.widget.hidden = true;
             }
         });
-
-        
-        
     },
     setupWidgets() {
         for (let i = 1; i <= 20; i++) {
             this._createPromptWidgets(i);
         }
-        const separator = ComfyWidgets["STRING"](this, "separator", ["STRING", { 
-            default: " ",
-            visible: false,
-            forceInput: true
-        }], app);
-        const active = ComfyWidgets["BOOLEAN"](this, "active", ["BOOLEAN", { 
-            default: true,
-            visible: false 
-        }], app);
-        if (separator?.widget) {
-            separator.widget.computeSize = () => [0, -4];
-            separator.widget.hidden = true;
-            this.separator = separator;
-        }
-        if (active?.widget) {
-            active.widget.computeSize = () => [0, -4];
-            active.widget.hidden = true;
-        }
+        this.separatorValue = " "; 
+        this.isActive = true; 
         this.serialize_widgets = true;
     },
     applyPromptMode() {
@@ -356,7 +287,7 @@ const MultiTextNode = {
                     label.classList.add('multitext-separator-label');
                     menuItem.appendChild(icon);
                     menuItem.appendChild(label);
-                    if (this.separator?.widget?.value === item.value) {
+                    if (this.separatorValue === item.value) {
                         menuItem.classList.add('selected');
                     }
                     menuItem.onclick = () => {
@@ -403,16 +334,11 @@ const MultiTextNode = {
                                 }
                             };
                         } else {
-                            if (this.separator?.widget) {
-                                this.separator.widget.value = item.value === '\\n' ? '\n' : item.value;
-                                if (this.separator.widget.callback) {
-                                    this.separator.widget.callback(this.separator.widget.value);
-                                }
-                                this.setDirtyCanvas(true);
-                                if (app.graph) {
-                                    app.graph.change();
-                                    app.graph.setDirtyCanvas(true);
-                                }
+                            this.separatorValue = item.value === '\\n' ? '\n' : item.value;
+                            this.setDirtyCanvas(true);
+                            if (app.graph) {
+                                app.graph.change();
+                                app.graph.setDirtyCanvas(true);
                             }
                             separatorMenu.remove();
                         }
@@ -487,14 +413,9 @@ const MultiTextNode = {
             const weightWidget = this.widgets.find(w => w.name === `weight${index}`);
             const labelWidget  = this.widgets.find(w => w.name === `label${index}`);
             if (!textWidget || !weightWidget || !labelWidget) return;
-
-            
             const dialog = DialogUtils.createDialog(THEME, {});
             dialog.dataset.promptIndex = index.toString();
-            
             const content = document.createDocumentFragment();
-
-            
             const saveTemplateButton = DialogUtils.createButton(THEME, {
                 innerHTML: '✚',
                 title: 'Save as Template',
@@ -503,7 +424,6 @@ const MultiTextNode = {
                     this.showSaveChoiceDialog(event, dialog.textarea.value, parseFloat(dialog.weightInput.value), dialog);
                 }
             });
-
             const saveButton = DialogUtils.createButton(THEME, {
                 innerHTML: '✔️',
                 className: 'multitext-dialog-button-save',
@@ -518,16 +438,12 @@ const MultiTextNode = {
                     this.setDirtyCanvas(true);
                 }
             });
-
             const closeBtn = DialogUtils.createButton(THEME, {
                 innerHTML: '×',
                 className: 'multitext-dialog-button-close',
                 onclick: () => dialog.remove()
             });
-
-            
             const header = DialogUtils.createHeader(THEME, `Edit Prompt ${index}`, [saveTemplateButton, saveButton, closeBtn]);
-
             let isDragging = false;
             let xOffset = 0;
             let yOffset = 0;
@@ -573,13 +489,10 @@ const MultiTextNode = {
             document.addEventListener('mousemove', drag); 
             document.addEventListener('mouseup', dragEnd);
             const cleanupDragMain = this._makeDialogDraggable(dialog, header); 
-
             content.appendChild(header);
             const contentWrapper = document.createElement('div');
             contentWrapper.classList.add('multitext-dialog-content');
             content.appendChild(contentWrapper);
-
-            
             const labelInput = DialogUtils.createInput(THEME, {
                 value: labelWidget.value || '',
                 placeholder: 'Optional name...',
@@ -587,16 +500,12 @@ const MultiTextNode = {
             dialog.labelInput = labelInput; 
             labelInput.style.marginBottom = '12px';
             contentWrapper.appendChild(labelInput);
-
-            
             const textarea = DialogUtils.createTextarea(THEME, {
                 value: textWidget.value || '',
                 placeholder: 'Enter prompt text here...',
             });
             dialog.textarea = textarea;
             contentWrapper.appendChild(textarea);
-
-            
             const toolbar = document.createElement('div');
             toolbar.classList.add('multitext-dialog-toolbar');
             const historyDropdown = document.createElement('div');
@@ -604,7 +513,6 @@ const MultiTextNode = {
             historyDropdown.classList.add('multitext-dialog-history-dropdown'); 
             historyDropdown.style.display = 'none';
             THEME.promptTools.quickActions.forEach(action => {
-                
                 const btn = DialogUtils.createButton(THEME, {
                     innerHTML: action.icon,
                     title: action.title,
@@ -624,7 +532,6 @@ const MultiTextNode = {
                 toolbar.appendChild(btn);
             });
             toolbar.appendChild(historyDropdown);
-            
             const weightGroup = document.createElement('div');
             weightGroup.classList.add('multitext-dialog-weight-group');
             const weightContainer = document.createElement('div');
@@ -645,8 +552,6 @@ const MultiTextNode = {
             weightGroup.appendChild(weightContainer);
             weightGroup.appendChild(toolbar); 
             contentWrapper.appendChild(weightGroup);
-
-            
             const presetContainer = document.createElement('div');
             presetContainer.classList.add('multitext-dialog-preset-container');
             presetContainer.style.display = 'flex';
@@ -803,22 +708,16 @@ const MultiTextNode = {
                             presetBtn.onclick = (e) => {
                                 e.stopPropagation();
                                 if (!preset.value) return; 
-                                
                                 const textarea = dialog.textarea;
                                 if (textarea) {
                                     const currentText = textarea.value;
                                     const newText = preset.value;
                                     textarea.value = currentText ? `${currentText}, ${newText}` : newText;
                                     textarea.dispatchEvent(new Event('input')); 
-                                    
-                                    
                                     const textWidget = this.widgets.find(w => w.name === `text${dialog.dataset.promptIndex}`);
                                     if (textWidget) {
                                         textWidget.value = textarea.value;
                                     }
-                                    
-
-                                    
                                     presetBtn.style.background = '#2d2d2d';
                                     setTimeout(() => {
                                         presetBtn.style.background = '#1e1e1e';
@@ -860,10 +759,8 @@ const MultiTextNode = {
                 const managementDialog = DialogUtils.createDialog(THEME, {
                     width: '320px',
                     maxHeight: '60vh',
-                    
                     className: 'multitext-manage-presets-dialog' 
                 });
-
                 const closeManageDialog = () => {
                     managementDialog.remove();
                     document.removeEventListener('mousedown', closeDialogOnClickOutside);
@@ -875,7 +772,6 @@ const MultiTextNode = {
                 });
                 const header = DialogUtils.createHeader(THEME, 'Manage Presets', [closeDialogButton]);
                 managementDialog.appendChild(header);
-
                 const contentContainer = document.createElement('div');
                 contentContainer.style.overflowY = 'auto';
                 contentContainer.style.overflowX = 'hidden';
@@ -884,9 +780,7 @@ const MultiTextNode = {
                 contentContainer.style.display = 'flex';
                 contentContainer.style.flexDirection = 'column';
                 contentContainer.style.gap = '8px';
-                
                 contentContainer.classList.add('multitext-dialog-content'); 
-
                 Object.entries(THEME.promptPresets).forEach(([category, categoryData]) => {
                     if (!categoryData || !categoryData.presets) return;
                     const categorySection = document.createElement('div');
@@ -894,13 +788,11 @@ const MultiTextNode = {
                     categorySection.style.flexDirection = 'column';
                     categorySection.style.gap = '4px';
                     categorySection.classList.add('multitext-manage-presets-category-section');
-
                     const categoryHeader = document.createElement('div');
                     categoryHeader.style.display = 'flex';
                     categoryHeader.style.alignItems = 'center';
                     categoryHeader.style.gap = '6px';
                     categoryHeader.classList.add('multitext-manage-presets-category-header');
-
                     const categoryTitle = document.createElement('h4');
                     categoryTitle.textContent = category.charAt(0).toUpperCase() + category.slice(1);
                     categoryTitle.style.margin = '0';
@@ -909,29 +801,23 @@ const MultiTextNode = {
                     categoryTitle.style.color = '#ccc';
                     categoryTitle.style.flex = '1';
                     categoryTitle.classList.add('multitext-manage-presets-category-title');
-
                     const addPresetBtn = DialogUtils.createButton(THEME, {
                         innerHTML: '+',
                         title: 'Add new preset',
-                        
                         className: 'multitext-manage-presets-add-button',
                         onclick: (e) => {
                             e.stopPropagation();
                             this.showSavePresetDialog('', 1.0, managementDialog); 
                         }
                     });
-                    
                     addPresetBtn.style.padding = '2px 6px'; 
                     addPresetBtn.style.fontSize = '12px';
                     addPresetBtn.style.minWidth = '20px';
-                    
-
                     const presetsList = document.createElement('div');
                     presetsList.style.display = 'flex';
                     presetsList.style.flexDirection = 'column';
                     presetsList.style.gap = '2px';
                     presetsList.classList.add('multitext-manage-presets-list');
-
                     categoryData.presets.forEach(preset => {
                         const presetItem = document.createElement('div');
                         presetItem.style.display = 'flex';
@@ -943,7 +829,6 @@ const MultiTextNode = {
                         presetItem.style.border = '1px solid #2c2c2c';
                         presetItem.style.fontSize = '12px';
                         presetItem.classList.add('multitext-manage-presets-item');
-
                         const presetLabel = document.createElement('span');
                         presetLabel.textContent = preset.label;
                         presetLabel.style.flex = '1';
@@ -952,39 +837,30 @@ const MultiTextNode = {
                         presetLabel.style.whiteSpace = 'nowrap';
                         presetLabel.style.color = '#999';
                         presetLabel.classList.add('multitext-manage-presets-item-label');
-
                         const buttonsContainer = document.createElement('div');
                         buttonsContainer.style.display = 'flex';
                         buttonsContainer.style.gap = '2px';
                         buttonsContainer.style.alignItems = 'center';
                         buttonsContainer.classList.add('multitext-manage-presets-item-buttons');
-
                         const editPresetBtn = DialogUtils.createButton(THEME, {
                             innerHTML: '✏️',
                             title: 'Edit preset',
                             className: 'multitext-manage-presets-action-button', 
                             onclick: (e) => {
                                 e.stopPropagation();
-                                
                                 const showEditPresetDialog = (preset, presetLabelElement, categorySectionElement, categoryDataObject, presetsListElement) => {
                                      const editDialog = DialogUtils.createDialog(THEME, {
                                         className: 'multitext-save-preset-dialog',
-                                        
                                     });
                                     editDialog.style.zIndex = '10002'; 
-
-                                    
                                     let isDraggingEdit = false;
                                     let xOffsetEdit = 0;
                                     let yOffsetEdit = 0;
-
                                     const removeDragListenersEdit = () => {
                                         document.removeEventListener('mousemove', dragEdit);
                                         document.removeEventListener('mouseup', dragEndEdit);
                                     };
-
                                     function dragStartEdit(e) {
-                                        
                                         if (e.target === editHeader || editHeader.contains(e.target)) { 
                                             const popupElement = editDialog; 
                                             if (!popupElement) return; 
@@ -995,12 +871,10 @@ const MultiTextNode = {
                                             xOffsetEdit = e.clientX - rect.left;
                                             yOffsetEdit = e.clientY - rect.top;
                                             e.preventDefault(); 
-                                            
                                             document.addEventListener('mousemove', dragEdit); 
                                             document.addEventListener('mouseup', dragEndEdit);
                                         }
                                     }
-
                                     function dragEdit(e) {
                                         if (isDraggingEdit) {
                                             const popupElement = editDialog;
@@ -1013,7 +887,6 @@ const MultiTextNode = {
                                             popupElement.style.transform = 'none'; 
                                         }
                                     }
-
                                     function dragEndEdit(e) {
                                         if (isDraggingEdit) {
                                             isDraggingEdit = false;
@@ -1021,8 +894,6 @@ const MultiTextNode = {
                                             removeDragListenersEdit(); 
                                         }
                                     }
-                                    
-
                                     const editHeader = DialogUtils.createHeader(THEME, 'Edit Preset', [
                                         DialogUtils.createButton(THEME, {
                                             innerHTML: '✕',
@@ -1033,7 +904,6 @@ const MultiTextNode = {
                                     editDialog.appendChild(editHeader); 
                                     editHeader.addEventListener('mousedown', dragStartEdit); 
                                     const cleanupDragEdit = this._makeDialogDraggable(editDialog, editHeader); 
-
                                     const nameInput = DialogUtils.createInput(THEME, {
                                         value: preset.label,
                                         placeholder: 'Preset name',
@@ -1082,15 +952,12 @@ const MultiTextNode = {
                                      document.body.appendChild(editDialog);
                                     nameInput.focus();
                                     nameInput.select();
-
-                                    
                                     requestAnimationFrame(() => { 
                                         const container = document.querySelector('.graph-canvas-container') || document.body;
                                         const containerRect = container.getBoundingClientRect();
                                         const dialogRect = editDialog.getBoundingClientRect();
                                         let desiredLeft = (containerRect.width - dialogRect.width) / 2 + containerRect.left;
                                         let desiredTop = (containerRect.height - dialogRect.height) / 2 + containerRect.top;
-                                        
                                         const clampedLeft = Math.max(
                                             containerRect.left + 10, 
                                             Math.min(containerRect.right - dialogRect.width - 10, desiredLeft)
@@ -1103,19 +970,15 @@ const MultiTextNode = {
                                         editDialog.style.top = clampedTop + 'px';
                                         editDialog.style.transform = 'none'; 
                                     });
-                                    
                                 };
                                 showEditPresetDialog(preset, presetLabel, categorySection, categoryData, presetsList);
                             }
                         });
-                        
                         editPresetBtn.style.background = 'none';
                         editPresetBtn.style.border = 'none';
                         editPresetBtn.style.padding = '2px';
                         editPresetBtn.style.opacity = '0.7';
                         editPresetBtn.style.fontSize = '11px';
-                         
-
                         const deletePresetBtn = DialogUtils.createButton(THEME, {
                             innerHTML: '🗑️',
                             title: 'Delete preset',
@@ -1142,19 +1005,15 @@ const MultiTextNode = {
                                 }
                             }
                         });
-                        
                         deletePresetBtn.style.background = 'none';
                         deletePresetBtn.style.border = 'none';
                         deletePresetBtn.style.padding = '2px';
                         deletePresetBtn.style.opacity = '0.7';
                         deletePresetBtn.style.fontSize = '11px';
-                        
-
                         [editPresetBtn, deletePresetBtn].forEach(btn => {
                             btn.onmouseover = () => btn.style.opacity = '1';
                             btn.onmouseout = () => btn.style.opacity = '0.7';
                         }); 
-
                         buttonsContainer.appendChild(editPresetBtn);
                         buttonsContainer.appendChild(deletePresetBtn);
                         presetItem.appendChild(presetLabel);
@@ -1169,15 +1028,12 @@ const MultiTextNode = {
                 });
                 managementDialog.appendChild(contentContainer);
                 document.body.appendChild(managementDialog);
-
-                
                 requestAnimationFrame(() => { 
                     const container = document.querySelector('.graph-canvas-container') || document.body;
                     const containerRect = container.getBoundingClientRect();
                     const dialogRect = managementDialog.getBoundingClientRect();
                     let desiredLeft = (containerRect.width - dialogRect.width) / 2 + containerRect.left;
                     let desiredTop = (containerRect.height - dialogRect.height) / 2 + containerRect.top;
-                    
                     const clampedLeft = Math.max(
                         containerRect.left,
                         Math.min(containerRect.right - dialogRect.width, desiredLeft)
@@ -1190,7 +1046,6 @@ const MultiTextNode = {
                     managementDialog.style.top = clampedTop + 'px';
                     managementDialog.style.transform = 'none'; 
                 });
-
                 const closeDialogOnClickOutside = (e) => {
                     if (!managementDialog.contains(e.target)) {
                        closeManageDialog();
@@ -1202,8 +1057,6 @@ const MultiTextNode = {
             presetContainer.appendChild(categoryContainer);
             presetContainer.appendChild(presetsContainer);
             contentWrapper.appendChild(presetContainer);
-
-            
             const templateSection = document.createElement('div');
             templateSection.classList.add('multitext-dialog-template-section');
             const templateHeader = document.createElement('div');
@@ -1248,7 +1101,6 @@ const MultiTextNode = {
                     editIcon.title = 'Edit template';
                     editIcon.onclick = (e) => {
                         e.stopPropagation(); 
-                        
                         this.showSaveTemplateDialog(
                             template.prompt, 
                             template.weight, 
@@ -1266,8 +1118,6 @@ const MultiTextNode = {
                             weightInput.value = template.weight;
                         }
                         textarea.dispatchEvent(new Event('input'));
-
-                        
                         const textWidget = this.widgets.find(w => w.name === `text${dialog.dataset.promptIndex}`);
                         const weightWidget = this.widgets.find(w => w.name === `weight${dialog.dataset.promptIndex}`);
                         if (textWidget) {
@@ -1276,7 +1126,6 @@ const MultiTextNode = {
                         if (weightWidget && template.weight !== undefined) {
                             weightWidget.value = parseFloat(weightInput.value);
                         }
-                        
                     };
                     templateGrid.appendChild(templateBtn);
                 });
@@ -1285,8 +1134,6 @@ const MultiTextNode = {
             contentWrapper.appendChild(templateSection);
             dialog.appendChild(content); 
             document.body.appendChild(dialog);
-
-            
             const container = document.querySelector('.graph-canvas-container');
             const containerRect = container ? container.getBoundingClientRect() : { left: 0, top: 0, right: window.innerWidth, bottom: window.innerHeight };
             const dialogRect = dialog.getBoundingClientRect();
@@ -1304,8 +1151,6 @@ const MultiTextNode = {
             dialog.style.top  = clampedTop + 'px';
             dialog.style.transform = 'none';
             textarea.focus();
-
-            
             dialog.textarea = textarea;
             dialog.weightInput = weightInput;
         } catch (error) {
@@ -1408,7 +1253,6 @@ const MultiTextNode = {
         }
         return -1;
     },
-
     loadPromptHistory() {
         try {
             const history = localStorage.getItem('multitext_history');
@@ -1424,19 +1268,13 @@ const MultiTextNode = {
             const history = this.loadPromptHistory();
             const newItem = { text, timestamp: Date.now() };
             const existingIndex = history.findIndex(item => item.text === text);
-            
             if (existingIndex !== -1) {
-                
                 history[existingIndex] = newItem;
                         } else {
-                
                 history.unshift(newItem);
             }
-            
-            
             const trimmedHistory = history.slice(0, 20);
             localStorage.setItem('multitext_history', JSON.stringify(trimmedHistory));
-            
         } catch (error) {
             console.error('Error saving to history:', error);
         }
@@ -1457,12 +1295,10 @@ const MultiTextNode = {
                 }
                 break;
             case 'default':
-                
                 if (confirm("This will remove all custom presets and templates and restore defaults. Are you sure?")) {
                     localStorage.removeItem('multitext_category_presets');
                     localStorage.removeItem('multitext_templates');
                     alert("Custom presets and templates cleared. Please reload the UI or node for changes to take full effect.");
-                    
                     const dialog = document.querySelector(`.multitext-dialog[data-prompt-index="${textarea.closest('.multitext-dialog')?.dataset.promptIndex}"]`);
                     dialog?.remove();
                 }
@@ -1646,7 +1482,6 @@ const MultiTextNode = {
             this.setDirtyCanvas(true);
             return;
         }
-
         if (this.currentHoverIndex === index) {
             if (this.tooltipState.visible) {
                 const canvasRect = ctx.canvas.getBoundingClientRect();
@@ -1656,57 +1491,42 @@ const MultiTextNode = {
             }
             return;
         }
-
         this.currentHoverIndex = index;
         const textWidget = index !== -1 ? this.widgets.find(w => w.name === `text${index + 1}`) : null;
-        
         this.tooltipState = {
             visible: textWidget?.value ? true : false,
             text: textWidget?.value || '',
             x: event.clientX - ctx.canvas.getBoundingClientRect().left,
             y: event.clientY - ctx.canvas.getBoundingClientRect().top
         };
-        
             this.setDirtyCanvas(true);
         },        
     showSavePresetDialog(text, weight, dialogToUpdate) {
-        
         const dialog = DialogUtils.createDialog(THEME, {
             width: '400px',
             maxHeight: '500px'
         });
-
-        
         const closeButton = DialogUtils.createButton(THEME, {
             icon: '<svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>',
             title: 'Close',
             onclick: () => dialog.remove()
         });
-
-        
         const header = DialogUtils.createHeader(THEME, 'Save Preset', [closeButton]);
         dialog.appendChild(header);
-
         const content = document.createElement('div');
         content.classList.add('multitext-dialog-content');
         content.style.padding = '16px';
-
-        
         const nameInput = DialogUtils.createInput(THEME, {
             placeholder: 'Optional preset name',
             className: 'multitext-save-preset-input'
         });
         nameInput.style.marginBottom = '12px';
-
-        
         const valueTextarea = DialogUtils.createTextarea(THEME, {
             placeholder: 'Preset value (required)',
             value: text || '',
             className: 'multitext-dialog-textarea'
         });
         valueTextarea.style.marginBottom = '12px';
-
-        
         valueTextarea.addEventListener('input', () => {
             if (!nameInput.value.trim()) {
                 const firstLine = valueTextarea.value.split('\n')[0].trim();
@@ -1714,8 +1534,6 @@ const MultiTextNode = {
                 nameInput.placeholder = truncated || 'Optional preset name';
             }
         });
-
-        
         const categorySelect = DialogUtils.createSelect(THEME, {
             className: 'multitext-save-preset-select',
             options: [
@@ -1727,21 +1545,15 @@ const MultiTextNode = {
                 { value: 'environment', label: '🌍 Environment' }
             ]
         });
-
         content.appendChild(nameInput);
         content.appendChild(valueTextarea);
         content.appendChild(categorySelect);
-
         const buttons = document.createElement('div');
         buttons.classList.add('multitext-save-preset-buttons'); 
-
-        
         const cancelBtn = document.createElement('button');
         cancelBtn.textContent = 'Cancel';
         cancelBtn.classList.add('multitext-save-preset-button', 'multitext-save-preset-button-cancel');
         cancelBtn.onclick = () => dialog.remove();
-
-        
         const saveBtn = document.createElement('button');
         saveBtn.textContent = 'Save';
         saveBtn.classList.add('multitext-save-preset-button', 'multitext-save-preset-button-save');
@@ -1751,44 +1563,30 @@ const MultiTextNode = {
                 alert("Please enter a preset value.");
                 return;
             }
-
             const name = nameInput.value.trim() || value.split('\n')[0].trim();
             const category = categorySelect.value;
-
             if (!category) {
                 alert("Please select a category.");
                 return;
             }
-
             try {
-                
                 if (!THEME.promptPresets[category]) {
                     THEME.promptPresets[category] = { presets: [] };
                 } else if (!Array.isArray(THEME.promptPresets[category].presets)) {
                     THEME.promptPresets[category].presets = [];
                 }
-
                 THEME.promptPresets[category].presets = THEME.promptPresets[category].presets.filter(preset => 
                     preset.label !== name
                 );
-
-                
                 THEME.promptPresets[category].presets.push({
                     value: valueTextarea.value.trim(), 
                     label: name,
                     weight: 1.0 
                 });
-
                 try {
                     localStorage.setItem('multitext_category_presets', JSON.stringify(THEME.promptPresets));
                     console.log(`Preset \"${name}\" successfully saved to ${category} category`);
-
                     dialog.remove();
-
-                    
-                    
-                    
-                    
                 } catch (error) {
                     console.error('Error saving preset:', error);
                     alert('Failed to save preset. Please try again.');
@@ -1800,22 +1598,16 @@ const MultiTextNode = {
                 dialog.remove(); 
             }
         };
-
         buttons.appendChild(cancelBtn);
         buttons.appendChild(saveBtn);
         content.appendChild(buttons);
-
         nameInput.addEventListener('keypress', (e) => {
             if (e.key === 'Enter') {
                 saveBtn.click();
             }
         });
-
         dialog.appendChild(content);
-
         document.body.appendChild(dialog);
-
-        
         const cleanupDragSavePreset = this._makeDialogDraggable(dialog, header);
         requestAnimationFrame(() => { 
             const container = document.querySelector('.graph-canvas-container') || document.body;
@@ -1823,7 +1615,6 @@ const MultiTextNode = {
             const dialogRect = dialog.getBoundingClientRect();
             let desiredLeft = (containerRect.width - dialogRect.width) / 2 + containerRect.left;
             let desiredTop = (containerRect.height - dialogRect.height) / 2 + containerRect.top;
-            
             const clampedLeft = Math.max(
                 containerRect.left + 10, 
                 Math.min(containerRect.right - dialogRect.width - 10, desiredLeft)
@@ -1836,38 +1627,28 @@ const MultiTextNode = {
             dialog.style.top = clampedTop + 'px';
             dialog.style.transform = 'none'; 
         });
-        
-
         nameInput.focus();
     },
     showSaveTemplateDialog(promptText, promptWeight, dialogToUpdate, existingName = '', existingCategory = '') {
-        
         const dialog = DialogUtils.createDialog(THEME, {}); 
         dialog.classList.remove('multitext-dialog'); 
         dialog.classList.add('multitext-save-preset-dialog'); 
-
         const title = document.createElement('div');
         title.textContent = existingName ? 'Edit Template' : 'Save Template';
         title.classList.add('multitext-save-preset-title');
         dialog.appendChild(title);
-
-        
         const nameInput = DialogUtils.createInput(THEME, {
             placeholder: 'Template name',
             value: existingName,
             className: 'multitext-save-preset-input'
         });
         dialog.appendChild(nameInput);
-
-        
         const promptTextarea = DialogUtils.createTextarea(THEME, {
             value: promptText || '',
             placeholder: 'Enter prompt text...',
             className: 'multitext-dialog-textarea'
         });
         dialog.appendChild(promptTextarea);
-
-        
         const categorySelect = DialogUtils.createSelect(THEME, {
             className: 'multitext-save-preset-select',
             options: Object.entries(THEME.promptTemplates).map(([key, cat]) => ({
@@ -1877,15 +1658,12 @@ const MultiTextNode = {
             }))
         });
         dialog.appendChild(categorySelect);
-
         const buttons = document.createElement('div');
         buttons.classList.add('multitext-save-preset-buttons');
-
         const cancelBtn = document.createElement('button');
         cancelBtn.textContent = 'Cancel';
         cancelBtn.classList.add('multitext-save-preset-button', 'multitext-save-preset-button-cancel');
         cancelBtn.onclick = () => dialog.remove();
-
         const saveBtn = document.createElement('button');
         saveBtn.textContent = 'Save';
         saveBtn.classList.add('multitext-save-preset-button', 'multitext-save-preset-button-save');
@@ -1893,7 +1671,6 @@ const MultiTextNode = {
             const name = nameInput.value.trim();
             const category = categorySelect.value;
             const finalPromptText = promptTextarea.value.trim();
-            
             if (!name || !finalPromptText || !category) {
                 alert("Please fill in all fields.");
                 return;
@@ -1940,7 +1717,6 @@ const MultiTextNode = {
                 dialog.remove();
             }
         };
-
         if (existingName && existingCategory) {
             const deleteBtn = document.createElement('button');
             deleteBtn.innerHTML = '✖';
@@ -2021,55 +1797,42 @@ const MultiTextNode = {
             buttons.appendChild(saveBtn);
             dialog.appendChild(buttons);
         }
-
         nameInput.addEventListener('keypress', (e) => {
             if (e.key === 'Enter') {
                 saveBtn.click();
             }
         });
-
         document.body.appendChild(dialog);
         nameInput.focus();
-
-        
         dialog.style.left = `calc(50% - ${dialog.offsetWidth / 2}px)`;
         dialog.style.top = `calc(50% - ${dialog.offsetHeight / 2}px)`;
     },
     showSaveChoiceDialog(event, textToSave, weightToSave, mainDialog) {
-        
         const choiceDialog = DialogUtils.createDialog(THEME, { minWidth: '200px' }); 
         choiceDialog.className = 'multitext-save-choice-dialog'; 
-
         const title = document.createElement('div');
         title.className = 'multitext-save-choice-title';
         title.textContent = 'Save As...';
         choiceDialog.appendChild(title);
-
         const buttonsDiv = document.createElement('div');
         buttonsDiv.className = 'multitext-save-choice-buttons';
-
         const savePresetBtn = document.createElement('button');
         savePresetBtn.textContent = 'Save as Preset';
         savePresetBtn.className = 'multitext-save-choice-button';
         savePresetBtn.onclick = () => {
             choiceDialog.remove();
-            
             this.showSavePresetDialog(textToSave, weightToSave, mainDialog);
         };
         buttonsDiv.appendChild(savePresetBtn);
-
         const saveTemplateBtn = document.createElement('button');
         saveTemplateBtn.textContent = 'Save as Template';
         saveTemplateBtn.className = 'multitext-save-choice-button';
         saveTemplateBtn.onclick = () => {
             choiceDialog.remove();
-            
             this.showSaveTemplateDialog(textToSave, weightToSave, mainDialog);
         };
         buttonsDiv.appendChild(saveTemplateBtn);
-
         choiceDialog.appendChild(buttonsDiv);
-
         document.body.appendChild(choiceDialog);
         const rect = event.target.getBoundingClientRect();
         const choiceRect = choiceDialog.getBoundingClientRect();
@@ -2084,7 +1847,6 @@ const MultiTextNode = {
         }
         choiceDialog.style.left = `${left}px`;
         choiceDialog.style.top = `${top}px`;
-
         const closeListener = (e) => {
             if (!choiceDialog.contains(e.target) && e.target !== event.target) {
                 choiceDialog.remove();
@@ -2096,11 +1858,7 @@ const MultiTextNode = {
     updateTemplateGrid(dialog) {
         const templateGrid = dialog.querySelector('.multitext-dialog-template-grid');
         if (!templateGrid) return;
-
-        
         templateGrid.innerHTML = '';
-
-        
         Object.entries(THEME.promptTemplates).forEach(([category, { icon, label, templates }]) => {
             if (!Array.isArray(templates)) {
                 console.warn(`Templates for category '${category}' is not an array. Skipping.`);
@@ -2109,25 +1867,19 @@ const MultiTextNode = {
             templates.forEach(template => {
                 const templateBtn = document.createElement('button');
                 templateBtn.classList.add('multitext-dialog-template-button');
-
                 const templateBtnHeader = document.createElement('div');
                 templateBtnHeader.classList.add('multitext-dialog-template-button-header');
                 templateBtnHeader.innerHTML = `${icon || '📝'} ${template.name}`;
-
                 const templateInfo = document.createElement('div');
                 templateInfo.classList.add('multitext-dialog-template-button-info');
                 templateInfo.innerHTML = `
                     <span>${label || category}</span>
                     <span>${template.weight ? template.weight.toFixed(1) : '-'}</span>
                 `;
-
-                
                 const editIcon = document.createElement('div');
                 editIcon.classList.add('multitext-template-edit-icon');
                 editIcon.innerHTML = '⋮';
                 editIcon.title = 'Edit template';
-
-                
                 editIcon.onclick = (e) => {
                     e.stopPropagation();
                     this.showSaveTemplateDialog(
@@ -2138,11 +1890,9 @@ const MultiTextNode = {
                         category
                     );
                 };
-
                 templateBtn.appendChild(editIcon);
                 templateBtn.appendChild(templateBtnHeader);
                 templateBtn.appendChild(templateInfo);
-
                 templateBtn.onclick = () => {
                     const textarea = dialog.textarea;
                     const weightInput = dialog.weightInput;
@@ -2154,20 +1904,14 @@ const MultiTextNode = {
                         textarea.dispatchEvent(new Event('input'));
                     }
                 };
-
                 templateGrid.appendChild(templateBtn);
             });
         });
     },
     updateHistoryDropdown(dropdown) {
         if (!dropdown) return;
-        
-        
         dropdown.innerHTML = '';
-        
-        
         const history = this.loadPromptHistory();
-        
         if (history.length === 0) {
             const emptyMessage = document.createElement('div');
             emptyMessage.classList.add('multitext-dialog-history-empty');
@@ -2175,40 +1919,30 @@ const MultiTextNode = {
             dropdown.appendChild(emptyMessage);
             return;
         }
-        
-        
         history.forEach((item, index) => {
             const historyItem = document.createElement('div');
             historyItem.classList.add('multitext-dialog-history-item');
-            
             const textSpan = document.createElement('span');
             textSpan.classList.add('multitext-dialog-history-text');
             textSpan.textContent = item.text;
             historyItem.appendChild(textSpan);
-            
             const deleteBtn = document.createElement('button');
             deleteBtn.classList.add('multitext-dialog-history-delete');
             deleteBtn.innerHTML = '✕';
             deleteBtn.onclick = (e) => {
                 e.stopPropagation();
-                
                 history.splice(index, 1);
-                
                 localStorage.setItem('multitext_history', JSON.stringify(history));
-                
                 historyItem.remove();
-                
                 if (history.length === 0) {
                     const emptyMessage = document.createElement('div');
                     emptyMessage.classList.add('multitext-dialog-history-empty');
                     emptyMessage.textContent = 'No history items';
                     dropdown.appendChild(emptyMessage);
                 }
-                
                 this.updateHistoryDropdown(dropdown);
             };
             historyItem.appendChild(deleteBtn);
-            
             historyItem.onclick = () => {
                 const textarea = dropdown.closest('.multitext-dialog')?.querySelector('.multitext-dialog-textarea');
                 if (textarea) {
@@ -2217,19 +1951,15 @@ const MultiTextNode = {
                 }
                 dropdown.style.display = 'none';
             };
-            
             historyItem.onmouseover = () => {
                 deleteBtn.style.display = 'block';
             };
-            
             historyItem.onmouseout = () => {
                 deleteBtn.style.display = 'none';
             };
-            
             dropdown.appendChild(historyItem);
         });
     },
-    
     loadFonts() {
         if (document.getElementById('multitext-fonts')) return;
         const head = document.head;
@@ -2244,21 +1974,16 @@ const MultiTextNode = {
         `;
         head.insertAdjacentHTML('beforeend', fontElements);
     },
-    
     _makeDialogDraggable(dialogElement, headerElement) {
         let isDragging = false;
         let xOffset = 0;
         let yOffset = 0;
-
         const removeListeners = () => {
             document.removeEventListener('mousemove', dragMove);
             document.removeEventListener('mouseup', dragEnd);
             if (headerElement) headerElement.style.cursor = 'move'; 
         };
-
         const dragStart = (e) => {
-            
-            
             if (headerElement && (e.target === headerElement || headerElement.contains(e.target)) && !e.target.closest('button')) {
                 isDragging = true;
                 dialogElement.style.transition = 'none'; 
@@ -2271,7 +1996,6 @@ const MultiTextNode = {
                 document.addEventListener('mouseup', dragEnd);
             }
         };
-
         const dragMove = (e) => {
             if (isDragging) {
                 e.preventDefault();
@@ -2282,27 +2006,18 @@ const MultiTextNode = {
                 dialogElement.style.transform = 'none'; 
             }
         };
-
         const dragEnd = (e) => {
             if (isDragging) {
                 isDragging = false;
                 removeListeners(); 
-                 
-                
             }
         };
-        
         if (headerElement) {
            headerElement.style.cursor = 'move'; 
            headerElement.addEventListener('mousedown', dragStart);
         } else {
             console.warn("Draggable dialog called without a valid header element.");
         }
-
-        
-        
-        
-        
         return () => {
             if (headerElement) {
                headerElement.removeEventListener('mousedown', dragStart);
@@ -2310,14 +2025,11 @@ const MultiTextNode = {
             removeListeners(); 
         };
     },
-    
     _showDeletePresetDialog(preset) {
         if (!preset) return;
         if (confirm(`Are you sure you want to delete the preset \"${preset.label}\"?`)) {
             let categoryFound = null;
             let presetIndex = -1;
-
-            
             for (const category in THEME.promptPresets) {
                 if (THEME.promptPresets[category]?.presets) {
                     presetIndex = THEME.promptPresets[category].presets.findIndex(p => p.label === preset.label && p.value === preset.value);
@@ -2327,30 +2039,21 @@ const MultiTextNode = {
                     }
                 }
             }
-
             if (categoryFound !== null && presetIndex > -1) {
                 THEME.promptPresets[categoryFound].presets.splice(presetIndex, 1);
                 localStorage.setItem('multitext_category_presets', JSON.stringify(THEME.promptPresets));
                 console.log(`Preset \"${preset.label}\" successfully deleted from ${categoryFound} category`);
-                
-                
-                
             } else {
                 console.warn("Could not find preset to delete in THEME structure:", preset);
             }
         }
     },
-    
-
-    
     _showEditPresetDialog(preset, labelElementToUpdate = null) {
         if (!preset) return;
-
         const editDialog = DialogUtils.createDialog(THEME, {
             className: 'multitext-save-preset-dialog',
         });
         editDialog.style.zIndex = '10002'; 
-
         const editHeader = DialogUtils.createHeader(THEME, 'Edit Preset', [
             DialogUtils.createButton(THEME, {
                 innerHTML: '✕',
@@ -2360,7 +2063,6 @@ const MultiTextNode = {
         ]);
         editDialog.appendChild(editHeader); 
         const cleanupDragEdit = this._makeDialogDraggable(editDialog, editHeader); 
-
         const nameInput = DialogUtils.createInput(THEME, {
             value: preset.label,
             placeholder: 'Preset name',
@@ -2391,7 +2093,6 @@ const MultiTextNode = {
                 const newName = nameInput.value.trim();
                 const newValue = valueInput.value.trim();
                 if (newName && newValue) {
-                    
                     let originalCategory = null;
                     for (const cat in THEME.promptPresets) {
                         if (THEME.promptPresets[cat]?.presets?.some(p => p.label === preset.label && p.value === preset.value)) {
@@ -2399,17 +2100,13 @@ const MultiTextNode = {
                             break;
                         }
                     }
-
                     if (originalCategory) {
                         const presetIndex = THEME.promptPresets[originalCategory].presets.findIndex(p => p.label === preset.label && p.value === preset.value);
                         if (presetIndex > -1) {
                             THEME.promptPresets[originalCategory].presets[presetIndex].label = newName;
                             THEME.promptPresets[originalCategory].presets[presetIndex].value = newValue;
-                            
                             preset.label = newName; 
                             preset.value = newValue;
-                            
-                            
                             if (labelElementToUpdate) {
                                 labelElementToUpdate.textContent = newName;
                             }
@@ -2432,14 +2129,12 @@ const MultiTextNode = {
          document.body.appendChild(editDialog);
         nameInput.focus();
         nameInput.select();
-
         requestAnimationFrame(() => { 
             const container = document.querySelector('.graph-canvas-container') || document.body;
             const containerRect = container.getBoundingClientRect();
             const dialogRect = editDialog.getBoundingClientRect();
             let desiredLeft = (containerRect.width - dialogRect.width) / 2 + containerRect.left;
             let desiredTop = (containerRect.height - dialogRect.height) / 2 + containerRect.top;
-            
             const clampedLeft = Math.max(
                 containerRect.left + 10, 
                 Math.min(containerRect.right - dialogRect.width - 10, desiredLeft)
@@ -2454,7 +2149,6 @@ const MultiTextNode = {
         });
     },
 };
-
 app.registerExtension({
     name: "SKB.MultiText",
     async beforeRegisterNodeDef(nodeType, nodeData, app) {
@@ -2468,3 +2162,40 @@ app.ui.settings.addSetting({
     type: "boolean",
     defaultValue: false,
 });
+(function() {
+    if (!app) {
+        console.error("[MultiText Patch] ComfyUI app not found, cannot patch graphToPrompt.");
+        return;
+    }
+    if (!app.originalMultiTextGraphToPrompt) { 
+        app.originalMultiTextGraphToPrompt = app.graphToPrompt;
+    }
+    app.graphToPrompt = async function () {
+        const prompt = await app.originalMultiTextGraphToPrompt.apply(this, arguments);
+        if (prompt && prompt.output) {
+            for (const nodeId in prompt.output) {
+                const nodeData = prompt.output[nodeId];
+                if (nodeData.class_type === "MultiTextNode") { 
+                    const graphNode = this.graph.getNodeById(Number(nodeId));
+                    if (graphNode) {
+                        if (!nodeData.inputs) {
+                            nodeData.inputs = {};
+                        }
+                        nodeData.inputs.separator = graphNode.separatorValue ?? " "; 
+                        nodeData.inputs.active = graphNode.isActive ?? true; 
+                    } else {
+                        console.warn(`[MultiText graphToPrompt wrapper] Could not find graph node for node ID ${nodeId}.`);
+                        if (!nodeData.inputs) {
+                            nodeData.inputs = {};
+                        }
+                        nodeData.inputs.separator = " ";
+                        nodeData.inputs.active = true;
+                    }
+                }
+            }
+        } else {
+             console.warn("[MultiText graphToPrompt wrapper] Prompt or prompt.output is undefined.");
+        }
+        return prompt;
+    };
+})();

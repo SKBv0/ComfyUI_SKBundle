@@ -3,15 +3,13 @@ class MultiTextNode:
     def INPUT_TYPES(s):
         return {
             "required": {
+            },
+            "hidden": {
                 "separator": ("STRING", {
                     "default": " ",
                     "multiline": False,
-                    "hidden": True,
-                    "forceInput": True
                 }),
-                "active": ("BOOLEAN", {"default": True, "hidden": True}),
-            },
-            "hidden": {
+                "active": ("BOOLEAN", {"default": True}),
                 **{f"enabled{i}": ("BOOLEAN", {"default": True})for i in range(1, 21)},
                 **{f"text{i}": ("STRING", {"multiline": True}) for i in range(1, 21)},
                 **{f"weight{i}": ("FLOAT", {
