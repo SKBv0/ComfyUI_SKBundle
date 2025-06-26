@@ -2,7 +2,17 @@
 
 A collection of custom nodes designed to enhance your workflow in ComfyUI. These nodes were developed to meet my own needs while working with ComfyUI. Although I'm not a programmer, I created these nodes with the help of Cursor AI and will continue to develop them over time.
 ![skb (16)](https://github.com/user-attachments/assets/63e37dcd-18f2-46c8-94ab-0c5a986ae868)
-### New: 📸 Lens Flare Node
+
+### New: 🎨 PaintPro Node
+- **PaintPro**: Draw and mask directly on the node with pressure-sensitive brush, eraser, and shape tools. 
+
+![paintpro](https://github.com/user-attachments/assets/01b76cc1-4efc-486c-b7df-60d985c636f8)
+
+
+https://github.com/user-attachments/assets/85a91585-2216-4363-ba48-7fdc10ce1bb2
+
+
+### Lens Flare Node
 - **Lens Flare**: Adds realistic lens flare effects to images. You can customise settings such as flare type, size, rotation and intensity.
 
 <div style="display: flex; justify-content: space-between;">
