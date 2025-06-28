@@ -160,10 +160,6 @@ class PaintPro:
                 logger.error("output_image_pil is invalid before final tensor conversion. Creating blank image.")
                 output_image_pil = Image.new('RGBA', (w, h), (0, 0, 0, 0))
             output_tensor = pil_to_tensor(output_image_pil)
-            if image is not None and len(image.shape) == 4:
-                if image.shape[1] == 3 or image.shape[1] == 4:
-                    if output_tensor.shape[-1] == 3 or output_tensor.shape[-1] == 4:
-                        output_tensor = output_tensor.permute(0, 3, 1, 2)
             if not isinstance(output_mask, torch.Tensor) or len(output_mask.shape) != 3 or output_mask.shape[0] != 1:
                 logger.error(f"Final mask tensor has unexpected shape or type: {output_mask.shape if isinstance(output_mask, torch.Tensor) else type(output_mask)}. Creating default mask.")
                 if len(output_tensor.shape) == 4:
@@ -171,7 +167,11 @@ class PaintPro:
                 else:
                     final_h, final_w = h, w
                 output_mask = torch.zeros((1, final_h, final_w), dtype=torch.float32)
-            return (output_tensor, output_mask)
+            if output_tensor.shape[-1] == 4:
+                output_tensor_rgb = output_tensor[..., :3]
+            else:
+                output_tensor_rgb = output_tensor
+            return (output_tensor_rgb, output_mask)
         except Exception as e:
             print(f"Error in process_image: {str(e)}")
             traceback.print_exc()
