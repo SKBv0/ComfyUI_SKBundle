@@ -3,7 +3,7 @@ const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
 const clamp01 = (value) => Math.max(0, Math.min(1, value));
 const clampRGB = (value) => Math.max(0, Math.min(255, value));
 
-// Canvas utility helper class - tekrarlanan kodu azaltmak için
+// Canvas utility helper class - reduces repeated code
 class CanvasUtils {
     static createCanvas(width, height, fillStyle = null) {
         const canvas = document.createElement('canvas');

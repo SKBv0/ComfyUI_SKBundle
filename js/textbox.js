@@ -345,6 +345,71 @@ app.registerExtension({
                         document.removeEventListener('mouseup', handleGlobalMouseUp);
                         if (oldOnRemoved) oldOnRemoved.call(this);
                     };
+
+                    // PaintPro pattern: Instance seviyesinde onMouseDown
+                    this.onMouseDown = function(e) {
+                        const x = e.canvasX - this.pos[0];
+                        const y = e.canvasY - this.pos[1];
+
+                        if (!this.toolbar) {
+                            this.toolbar = TOOLBAR_TOOLS;
+                        }
+
+                        const toolbarHeight = 30;
+                        const buttonSize = 14;
+                        const buttonSpacing = 0;
+                        const leftMargin = 3;
+
+                        if (y < toolbarHeight) {
+                            let currentX = leftMargin;
+                            let buttonY = (toolbarHeight - buttonSize) / 2;
+
+                            for (let i = 0; i < this.toolbar.length; i++) {
+                                const tool = this.toolbar[i];
+
+                                if (tool.type === 'divider') {
+                                    if (currentX + 2 > this.size[0] - leftMargin) {
+                                        break;
+                                    }
+                                    currentX += 2;
+                                    continue;
+                                }
+
+                                if (currentX + buttonSize > this.size[0] - leftMargin) {
+                                    break;
+                                }
+
+                                if (x >= currentX && x <= currentX + buttonSize &&
+                                    y >= buttonY && y <= buttonY + buttonSize) {
+
+                                    if (tool.action) {
+                                        this.executeToolAction(tool.action);
+                                    }
+                                    return true;
+                                }
+
+                                currentX += buttonSize + buttonSpacing;
+                            }
+
+                            return true; // Prevent dragging in toolbar area
+                        }
+
+                        const canvasX = 10;
+                        const canvasY = toolbarHeight + 10;
+                        const canvasWidth = this.size[0] - 20;
+                        const canvasHeight = this.size[1] - toolbarHeight - 20;
+
+                        if (x >= canvasX && x <= canvasX + canvasWidth &&
+                            y >= canvasY && y <= canvasY + canvasHeight) {
+                            this.uiState.isSelected = true;
+                            this.uiState.isDragging = true;
+                            this.uiState.dragStart = { x, y };
+                            this.setDirtyCanvas(true);
+                            return true;
+                        }
+
+                        return false;
+                    }.bind(this);
                 },
 
                 onDrawForeground(ctx) {
@@ -761,72 +826,6 @@ app.registerExtension({
                     }
                 },
 
-                onMouseDown(e) {
-                    const x = e.canvasX - this.pos[0];
-                    const y = e.canvasY - this.pos[1];
-
-                    if (!this.toolbar) {
-                        this.toolbar = TOOLBAR_TOOLS;
-                    }
-
-                    const toolbarHeight = 30;
-                    const buttonSize = 14;
-                    const buttonSpacing = 0;
-                    const leftMargin = 3;
-
-                    if (y < toolbarHeight) {
-                        let currentX = leftMargin;
-                        let buttonY = (toolbarHeight - buttonSize) / 2;
-
-                        for (let i = 0; i < this.toolbar.length; i++) {
-                            const tool = this.toolbar[i];
-
-                            if (tool.type === 'divider') {
-                                if (currentX + 2 > this.size[0] - leftMargin) {
-                                    break;
-                                }
-                                currentX += 2;
-                                continue;
-                            }
-
-                            if (currentX + buttonSize > this.size[0] - leftMargin) {
-                                break;
-                            }
-
-                            if (x >= currentX && x <= currentX + buttonSize &&
-                                y >= buttonY && y <= buttonY + buttonSize) {
-
-                                if (tool.action) {
-                                    this.executeToolAction(tool.action);
-                                }
-                                return true;
-                            }
-
-                            currentX += buttonSize + buttonSpacing;
-                        }
-
-                        return false;
-                    }
-
-                    const canvasX = 10;
-                    const canvasY = toolbarHeight + 10;
-                    const canvasWidth = this.size[0] - 20;
-                    const canvasHeight = this.size[1] - toolbarHeight - 20;
-
-
-                    if (x >= canvasX + 2 && x <= canvasX + canvasWidth - 2 &&
-                        y >= canvasY + 2 && y <= canvasY + canvasHeight - 2) {
-
-                        this.uiState.isSelected = true;
-                        this.uiState.isDragging = true;
-                        this.uiState.dragStart = { x, y };
-
-                        this.setDirtyCanvas(true);
-                        return true;
-                    }
-
-                    return false;
-                },
 
                 onMouseMove(e) {
                     const x = e.canvasX - this.pos[0];

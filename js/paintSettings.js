@@ -47,7 +47,7 @@ export class SettingsManager {
             border-radius: 8px;
             box-shadow: 0 4px 20px rgba(0,0,0,0.3);
             font-family: 'Inter', sans-serif;
-            z-index: 10000;
+            z-index: 1000003;
             color: #EFEFEF;
             padding: 5px; 
         `;

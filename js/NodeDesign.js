@@ -44,17 +44,6 @@ const ButtonManager = {
         this.updateToggleButton();
     },
     initUndoRedo() {
-        document.addEventListener('keydown', (e) => {
-            if (e.ctrlKey || e.metaKey) {
-                if (e.key === 'z') {
-                    e.preventDefault();
-                    this.undo();
-                } else if (e.key === 'y' || (e.shiftKey && e.key === 'Z')) {
-                    e.preventDefault();
-                    this.redo();
-                }
-            }
-        });
     },
     addToUndoStack(action) {
         this.undoStack.push(action);
@@ -160,6 +149,8 @@ const ButtonManager = {
             redo: 'Redo',
             smartAlign: 'Smart Align',
             treeView: 'Tree View',
+            placeRight: 'Place Right (chain)',
+            placeBelow: 'Place Below (chain)',
             toggleMode: 'Toggle Mode'
         };
         return titles[buttonId] || '';
@@ -180,6 +171,8 @@ const ButtonManager = {
             { id: 'redo', action: this.redo },
             { id: 'smartAlign', action: this.smartAlign },
             { id: 'treeView', action: this.treeView },
+            { id: 'placeRight', action: () => this.placeAdjacent('right') },
+            { id: 'placeBelow', action: () => this.placeAdjacent('below') },
             { id: 'toggleMode', action: this.toggleMode },
             { type: 'divider' },
             { id: 'close', action: this.close }
@@ -704,6 +697,55 @@ const ButtonManager = {
                 });
             }
         };
+        return this.applyAction(action);
+    },
+    placeAdjacent(direction = 'right', gap = 20) {
+        const selected = this.getSelectedNodes();
+        if (selected.length < 2) return false;
+
+        const axis = direction === 'right' ? 0 : 1;
+        const otherAxis = axis === 0 ? 1 : 0;
+
+        const originalStates = {};
+        selected.forEach(n => {
+            originalStates[n.id] = { pos: [...n.pos], size: [...n.size] };
+        });
+
+        // Prefer connection-based order when possible
+        const analysis = this.analyzeConnectionsBFS(selected);
+        const flow = analysis && analysis.sortedNodes && analysis.sortedNodes.length === selected.length
+            ? analysis.sortedNodes
+            : [...selected].sort((a, b) => originalStates[a.id].pos[axis] - originalStates[b.id].pos[axis]);
+
+        const anchor = flow[0];
+        const rest = flow.slice(1);
+
+        const targetPositions = {};
+        let currentCoord = originalStates[anchor.id].pos[axis] + originalStates[anchor.id].size[axis] + gap;
+        rest.forEach(n => {
+            const newPos = [...originalStates[n.id].pos];
+            newPos[axis] = currentCoord;
+            newPos[otherAxis] = originalStates[anchor.id].pos[otherAxis];
+            targetPositions[n.id] = newPos;
+            currentCoord += originalStates[n.id].size[axis] + gap;
+        });
+
+        const action = {
+            undo: () => {
+                selected.forEach(n => {
+                    const st = originalStates[n.id];
+                    n.pos = [...st.pos];
+                    n.size = [...st.size];
+                });
+            },
+            redo: () => {
+                rest.forEach(n => {
+                    const pos = targetPositions[n.id];
+                    if (pos) n.pos = [Number(pos[0]) || 0, Number(pos[1]) || 0];
+                });
+            }
+        };
+
         return this.applyAction(action);
     },
     findRootNode(nodes) {

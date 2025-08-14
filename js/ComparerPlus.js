@@ -86,6 +86,80 @@ app.registerExtension({
 
                 this.addContextMenu();
                 this.bindKeyboardEvents();
+
+                // Instance-level onMouseDown to handle toolbar and grid controls
+                this.onMouseDown = function(event) {
+                    const [x, y] = this.getLocalMousePos(event);
+                    
+                    if (this.properties.compare_mode === COMPARE_MODES.GRID) {
+                        if (this.gridMinusButton &&
+                            x >= this.gridMinusButton.x &&
+                            x <= this.gridMinusButton.x + this.gridMinusButton.width &&
+                            y >= this.gridMinusButton.y &&
+                            y <= this.gridMinusButton.y + this.gridMinusButton.height) {
+                            
+                            this.properties.gridSize = Math.max(2, this.properties.gridSize - 1);
+                            this.setDirtyCanvas(true);
+                            return true;
+                        }
+
+                        if (this.gridPlusButton &&
+                            x >= this.gridPlusButton.x &&
+                            x <= this.gridPlusButton.x + this.gridPlusButton.width &&
+                            y >= this.gridPlusButton.y &&
+                            y <= this.gridPlusButton.y + this.gridPlusButton.height) {
+                            
+                            this.properties.gridSize = Math.min(10, this.properties.gridSize + 1);
+                            this.setDirtyCanvas(true);
+                            return true;
+                        }
+                    }
+
+                    // Check mode button area first - don't interfere with button clicks
+                    if (this.modeButtonArea && 
+                        x >= this.modeButtonArea.x && 
+                        x <= this.modeButtonArea.x + this.modeButtonArea.width &&
+                        y >= this.modeButtonArea.y && 
+                        y <= this.modeButtonArea.y + this.modeButtonArea.height) {
+                        
+                        const modes = Object.values(COMPARE_MODES);
+                        const currentIndex = modes.indexOf(this.properties.compare_mode);
+                        const nextIndex = (currentIndex + 1) % modes.length;
+                        this.properties.compare_mode = modes[nextIndex];
+                        this.setDirtyCanvas(true);
+                        return true;
+                    }
+
+                    this.isPointerDown = true;
+                    this.lastPointerPos = [x, y];
+
+                    // Check for opacity slider specifically in fade mode
+                    if (this.properties.compare_mode === COMPARE_MODES.FADE &&
+                        this.opacitySliderArea &&
+                        x >= this.opacitySliderArea.x &&
+                        x <= this.opacitySliderArea.x + this.opacitySliderArea.width &&
+                        y >= this.opacitySliderArea.y &&
+                        y <= this.opacitySliderArea.y + this.opacitySliderArea.height) {
+                        
+                        this.isOpacitySliderDragging = true;
+                        const relativeY = (y - this.opacitySliderArea.y) / this.opacitySliderArea.height;
+                        this.properties.fadeOpacity = 1 - Math.max(0, Math.min(1, relativeY));
+                        this.setDirtyCanvas(true);
+                        return true;
+                    }
+
+                    // Only do slider/comparison interaction if not clicking on buttons
+                    if (this.imgs && this.imgs.length > 0) {
+                        if (this.properties.compare_mode === COMPARE_MODES.SLIDE) {
+                            this.properties.dividerPosition = x / this.size[0];
+                            this.properties.dividerPosition = Math.max(0, Math.min(1, this.properties.dividerPosition));
+                            this.setDirtyCanvas(true);
+                            return true;
+                        }
+                    }
+
+                    return false;
+                }.bind(this);
             };
 
             nodeType.prototype.bindKeyboardEvents = function() {
@@ -689,74 +763,6 @@ app.registerExtension({
                 document.body.style.cursor = 'default';
             };
 
-            nodeType.prototype.onMouseDown = function(event) {
-                const [x, y] = this.getLocalMousePos(event);
-                
-                if (this.properties.compare_mode === COMPARE_MODES.GRID) {
-                    if (this.gridMinusButton &&
-                        x >= this.gridMinusButton.x &&
-                        x <= this.gridMinusButton.x + this.gridMinusButton.width &&
-                        y >= this.gridMinusButton.y &&
-                        y <= this.gridMinusButton.y + this.gridMinusButton.height) {
-                        
-                        this.properties.gridSize = Math.max(2, this.properties.gridSize - 1);
-                        this.setDirtyCanvas(true);
-                        return true;
-                    }
-                    
-                    if (this.gridPlusButton &&
-                        x >= this.gridPlusButton.x &&
-                        x <= this.gridPlusButton.x + this.gridPlusButton.width &&
-                        y >= this.gridPlusButton.y &&
-                        y <= this.gridPlusButton.y + this.gridPlusButton.height) {
-                        
-                        this.properties.gridSize = Math.min(8, this.properties.gridSize + 1);
-                        this.setDirtyCanvas(true);
-                        return true;
-                    }
-                }
-
-                if (this.properties.compare_mode === COMPARE_MODES.FADE &&
-                    this.opacitySliderArea &&
-                    x >= this.opacitySliderArea.x &&
-                    x <= this.opacitySliderArea.x + this.opacitySliderArea.width &&
-                    y >= this.opacitySliderArea.y &&
-                    y <= this.opacitySliderArea.y + this.opacitySliderArea.height) {
-                    
-                    this.isOpacitySliderDragging = true;
-                    const relativeY = (y - this.opacitySliderArea.y) / this.opacitySliderArea.height;
-                    this.properties.fadeOpacity = 1 - Math.max(0, Math.min(1, relativeY));
-                    this.setDirtyCanvas(true);
-                    return true;
-                }
-                
-                if (this.modeButtonArea && 
-                    x >= this.modeButtonArea.x && 
-                    x <= this.modeButtonArea.x + this.modeButtonArea.width &&
-                    y >= this.modeButtonArea.y && 
-                    y <= this.modeButtonArea.y + this.modeButtonArea.height) {
-                    
-                    const modes = Object.values(COMPARE_MODES);
-                    const currentIndex = modes.indexOf(this.properties.compare_mode);
-                    const nextIndex = (currentIndex + 1) % modes.length;
-                    this.properties.compare_mode = modes[nextIndex];
-                    this.setDirtyCanvas(true);
-                    return true;
-                }
-                
-                if (this.dividerHitArea && 
-                    x >= this.dividerHitArea.x && 
-                    x <= this.dividerHitArea.x + this.dividerHitArea.width &&
-                    y >= this.dividerHitArea.y && 
-                    y <= this.dividerHitArea.y + this.dividerHitArea.height) {
-                    
-                    this.isPointerDown = true;
-                    this.properties.dividerPosition = Math.max(0, Math.min(1, x / this.size[0]));
-                    this.setDirtyCanvas(true);
-                    return true;
-                }
-                return false;
-            };
         }
     }
 });

@@ -100,6 +100,19 @@ export const INTERACTION_CONFIG = {
     GROUP_WIDTH_MULTIPLIER: 0.7
 };
 
+export const REFRESH_BUTTON = {
+    SIZE: 20,
+    MARGIN: 10,
+    ICON: "⟳"
+};
+
+export const FULLSCREEN_BUTTON = {
+    SIZE: 20,
+    MARGIN: 10,
+    ICON: "⛶"
+};
+
+
 export const BRUSH_SIZES = {
     SMALL: 5,
     MEDIUM: 15,
@@ -143,7 +156,7 @@ export const UI_CONFIG = {
     TOOLTIPS: {
         BACKGROUND: "rgba(0,0,0,0.7)",
         TEXT: "#eee",
-        PADDING: 8,
+        PADDING: 4,
         BORDER_RADIUS: 6
     },
     NODE: {

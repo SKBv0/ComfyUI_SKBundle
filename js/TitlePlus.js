@@ -119,7 +119,9 @@ app.registerExtension({
                     resizable: true,
                     draggable: true
                 };
-                this.originalPos = this.pos ? [...this.pos] : [0, 0];
+                // Initialize position properly to avoid null values
+                if (!this.pos) this.pos = [0, 0];
+                this.originalPos = [...this.pos];
                 this.originalSize = this.size ? [...this.size] : [200, 100];
                 this.rotation = 0;
                 this.fadeProgress = undefined;
@@ -130,10 +132,29 @@ app.registerExtension({
                 this.properties.animationEasing = "linear";
                 this.isAnimating = false;
                 this.currentAnimationType = "none";
+                this.animationOffsetX = 0;
+                this.animationOffsetY = 0;
                 this.loadFonts();
                 this.resizable = true;
                 this.size = this.computeSize();
                 this.setSize(this.size);
+                
+                this.onMouseDown = function(e, local_pos) {
+                    if (!local_pos) return false;
+                    
+                    const iconX = this.size[0] - EDIT_ICON_SIZE - EDIT_ICON_MARGIN;
+                    const iconY = this.size[1] - EDIT_ICON_SIZE - EDIT_ICON_MARGIN;
+                    
+                    if (this.mouseOver && local_pos[0] > iconX && local_pos[0] < iconX + EDIT_ICON_SIZE &&
+                        local_pos[1] > iconY && local_pos[1] < iconY + EDIT_ICON_SIZE) {
+                        this.showEditDialog();
+                        return true;
+                    }
+                    
+                    
+                    return false;
+                }.bind(this);
+
             };
             
             const loadedFonts = new Set();
@@ -192,17 +213,14 @@ app.registerExtension({
                     this.stopAnimation();
                 }
                 this.isAnimating = true;
-                this.wasPaused = false;
                 this.currentAnimationType = this.properties.animationType;
-                if (!this.originalPos || this.pos[0] !== this.originalPos[0] || this.pos[1] !== this.originalPos[1]) {
-                this.originalPos = [...this.pos];
-                }
-                this.originalSize = [...this.size];
+                
+                this.animationOffsetX = 0;
+                this.animationOffsetY = 0;
+                this.progress = 0;
                 const node = this;
-                const startTime = this.pausedTime || performance.now();
-                let lastFrameTime = startTime;
-                this.progress = this.progress || 0;
-                this.direction = this.direction || 1;
+                
+                let lastFrameTime = performance.now();
                 const duration = this.properties.animationDuration;
                 const animationType = this.properties.animationType;
                 const easing = this.properties.animationEasing || 'linear';
@@ -211,20 +229,32 @@ app.registerExtension({
                 const targetFPS = 60;
                 const frameInterval = 1000 / targetFPS;
                 const animate = (currentTime) => {
-                    if (!node.properties.animation || node.currentAnimationType !== animationType || node.wasPaused) {
+                    if (!node.properties.animation) {
                         return;
                     }
+                    
                     const deltaTime = currentTime - lastFrameTime;
                     if (deltaTime < frameInterval) {
                         node.animationTimer = requestAnimationFrame(animate);
                         return;
                     }
-                    this.progress += (deltaTime / duration) * this.direction;
-                    if (this.progress >= 1 || this.progress <= 0) {
-                        this.progress = 0;  
+                    
+                    const currentDuration = node.properties.animationDuration;
+                    node.progress = (node.progress || 0) + (deltaTime / currentDuration);
+                    if (node.progress >= 1) {
+                        node.progress = 0;  
                     }
-                    const easedProgress = easingFunction(this.progress);
+                    
+                    const easedProgress = easingFunction(node.progress);
+                    
                     animationFunction.call(node, easedProgress);
+                    
+                    if (node.mouseOver) {
+                        node.animationOffsetX = 0;
+                        node.animationOffsetY = 0;
+                        node.rotation = 0;
+                        node.fadeProgress = undefined;
+                    }
                     lastFrameTime = currentTime;
                     node.animationTimer = requestAnimationFrame(animate);
                 };
@@ -235,10 +265,9 @@ app.registerExtension({
                     cancelAnimationFrame(this.animationTimer);
                     this.animationTimer = null;
                 }
-                this.bounceBaseY = null;
-                this.shakeBasePos = null;
-                this.slideOffset = 0;
-                this.isSliding = false;
+                
+                this.animationOffsetX = 0;
+                this.animationOffsetY = 0;
                 this.rotation = 0;
                 this.fadeProgress = undefined;
                 this.isAnimating = false;
@@ -276,13 +305,15 @@ app.registerExtension({
                 slide: function(progress) {
                     const distance = this.size[0] * 0.5;
                     const offset = Math.sin(progress * Math.PI * 2) * distance;
-                    this.pos[0] = this.originalPos[0] + offset;
+                    this.animationOffsetX = offset;
+                    this.animationOffsetY = 0;
                     this.setDirtyCanvas(true, false);
                 },
                 bounce: function(progress) {
                     const amplitude = 20;
                     const offset = amplitude * Math.abs(Math.sin(progress * Math.PI * 2));
-                    this.pos[1] = this.originalPos[1] - offset;
+                    this.animationOffsetX = 0;
+                    this.animationOffsetY = -offset;
                     this.setDirtyCanvas(true, false);
                 },
                 rotate: function(progress) {
@@ -295,8 +326,8 @@ app.registerExtension({
                     const frequency = 8;
                     const shakeX = Math.sin(progress * Math.PI * frequency * 2) * amplitude;
                     const shakeY = Math.cos(progress * Math.PI * frequency * 2) * amplitude;
-                    this.pos[0] = this.originalPos[0] + shakeX;
-                    this.pos[1] = this.originalPos[1] + shakeY;
+                    this.animationOffsetX = shakeX;
+                    this.animationOffsetY = shakeY;
                     this.setDirtyCanvas(true, false);
                 }
             };
@@ -542,7 +573,7 @@ app.registerExtension({
                 img.src = imageUrl;
             };
             nodeType.prototype.onMouseDown = function(e, local_pos) {
-                if (!local_pos) return null;
+                if (!local_pos) return false;
                 
                 const iconX = this.size[0] - EDIT_ICON_SIZE - EDIT_ICON_MARGIN;
                 const iconY = this.size[1] - EDIT_ICON_SIZE - EDIT_ICON_MARGIN;
@@ -551,7 +582,7 @@ app.registerExtension({
                     this.showEditDialog();
                     return true;
                 }
-                return null;
+                return false;
             };
             nodeType.prototype.onMouseMove = function(e, local_pos) {
                 if (!local_pos) return;
@@ -590,34 +621,18 @@ app.registerExtension({
                 this.draggingTitle = false;
                 this.draggingSubtitle = false;
             };
-            nodeType.prototype.onMouseEnter = function() {
-                if (this.properties.animation && this.isAnimating) {
-                    this.pauseAnimation();
-                }
-                if (this.editButton) {
-                    this.editButton.style.opacity = '1';
-                }
-            };
-            nodeType.prototype.onMouseLeave = function() {
-                if (this.properties.animation && this.wasPaused) {
-                    this.resumeAnimation();
-                }
-                if (this.editButton) {
-                    this.editButton.style.opacity = '0';
-                }
-            };
             nodeType.prototype.pauseAnimation = function() {
-                if (this.animationTimer) {
-                    cancelAnimationFrame(this.animationTimer);
-                    this.animationTimer = null;
+                if (this.isAnimating) {
                     this.wasPaused = true;
-                    this.pausedTime = performance.now();
+                    this.savedProgress = this.progress || 0;
+                    this.savedDirection = this.direction || 1;
                 }
             };
             nodeType.prototype.resumeAnimation = function() {
                 if (this.wasPaused) {
                     this.wasPaused = false;
-                    this.startAnimation(); 
+                    this.progress = this.savedProgress || 0;
+                    this.direction = this.savedDirection || 1;
                 }
             };
             nodeType.prototype.getExtraMenuOptions = function(graphCanvas) {
@@ -1068,8 +1083,8 @@ app.registerExtension({
                                     </select>
                                 </div>
                                 <div class="row">
-                                    <label>Animation Duration (ms)</label>
-                                    <input type="number" id="animationDuration" value="${that.properties.animationDuration}" min="100" max="5000" step="100">
+                                    <label>Animation Speed: <span id="durationValue">${that.properties.animationDuration}ms</span></label>
+                                    <input type="range" id="animationDuration" value="${that.properties.animationDuration}" min="100" max="3000" step="50" style="width: 100%;">
                                 </div>
                                 <div class="row">
                                     <label>Animation Easing</label>
@@ -1284,12 +1299,24 @@ app.registerExtension({
                     }
                 });
                 ['titleFontSize', 'subtitleFontSize', 'borderRadius', 'padding', 'titleSubtitleGap', 
-                 'shadowBlur', 'shadowOffsetX', 'shadowOffsetY', 'animationDuration'].forEach(id => {
+                 'shadowBlur', 'shadowOffsetX', 'shadowOffsetY'].forEach(id => {
                     const element = dialog.querySelector(`#${id}`);
                     if (element) {
                         element.addEventListener('input', (e) => updateProperty(id, e.target.value, 'int'));
                     }
                 });
+                
+                const durationSlider = dialog.querySelector('#animationDuration');
+                if (durationSlider) {
+                    durationSlider.addEventListener('input', (e) => {
+                        const value = e.target.value;
+                        const durationLabel = dialog.querySelector('#durationValue');
+                        if (durationLabel) {
+                            durationLabel.textContent = value + 'ms';
+                        }
+                        updateProperty('animationDuration', value, 'int');
+                    });
+                }
                 ['titleColor', 'subtitleColor', 'backgroundColor', 'accentColor', 'shadowColor', 
                  'gradientStartColor', 'gradientEndColor'].forEach(id => {
                     const element = dialog.querySelector(`#${id}`);
@@ -1330,6 +1357,10 @@ app.registerExtension({
                 };
                 const originalProperties = {...that.properties};
                 dialog.querySelector('.close-btn').addEventListener('click', () => {
+                    // Stop animation and restore position before reverting properties
+                    if (that.isAnimating) {
+                        that.stopAnimation();
+                    }
                     Object.assign(that.properties, originalProperties);
                     that.setDirtyCanvas(true, true);
                 });
@@ -1483,7 +1514,13 @@ app.registerExtension({
                     o.properties[key] = this.properties[key];
                 }
                 o.size = [...this.size];
+                
+                // Simple position save - no animation corruption
+                if (!this.pos) this.pos = [0, 0];
+                if (this.pos[0] === null || this.pos[0] === undefined) this.pos[0] = 0;
+                if (this.pos[1] === null || this.pos[1] === undefined) this.pos[1] = 0;
                 o.pos = [...this.pos];
+                
                 if (this.properties.customBackground && this.properties.backgroundUrl) {
                     o.properties.backgroundUrl = this.properties.backgroundUrl;
                 }
@@ -1504,13 +1541,24 @@ app.registerExtension({
                     this.size = [...o.size];
                     this.originalSize = [...o.size];
                 }
-                if (o.pos) {
+                if (o.pos && Array.isArray(o.pos) && o.pos.length === 2 && 
+                    typeof o.pos[0] === 'number' && typeof o.pos[1] === 'number' &&
+                    !isNaN(o.pos[0]) && !isNaN(o.pos[1])) {
                     this.pos = [...o.pos];
                     this.originalPos = [...o.pos];
+                } else {
+                    // Ensure pos is never null or invalid
+                    if (!this.pos) this.pos = [0, 0];
+                    if (this.pos[0] === null || this.pos[0] === undefined || isNaN(this.pos[0])) this.pos[0] = 0;
+                    if (this.pos[1] === null || this.pos[1] === undefined || isNaN(this.pos[1])) this.pos[1] = 0;
+                    this.originalPos = [...this.pos];
                 }
                 if (this.properties.customBackground && this.properties.backgroundUrl) {
                     this.setCustomBackground(this.properties.backgroundUrl);
                 }
+                this.animationOffsetX = 0;
+                this.animationOffsetY = 0;
+                
                 if (this.properties.animation) {
                     this.isAnimating = false;
                     this.currentAnimationType = this.properties.animationType;
@@ -1536,12 +1584,20 @@ LGraphCanvas.prototype.drawNode = function(node, ctx) {
         const originalBgColor = node.bgcolor;
         node.color = "rgba(0,0,0,0)";
         node.bgcolor = "rgba(0,0,0,0)";
+        
+        ctx.save();
+        if (node.isAnimating && (node.animationOffsetX || node.animationOffsetY)) {
+            ctx.translate(node.animationOffsetX || 0, node.animationOffsetY || 0);
+        }
+        
         const result = oldDrawNode.apply(this, arguments);
         node.color = originalColor;
         node.bgcolor = originalBgColor;
         if (node.onDrawForeground) {
             node.onDrawForeground(ctx);
         }
+        
+        ctx.restore();
         if (node.mouseOver) {
             
             

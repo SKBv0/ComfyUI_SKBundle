@@ -17,7 +17,9 @@ export const SVG = {
     smartAlign: `<svg viewBox="0 0 24 24" stroke="${svgColor}" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v16m-8-8h16"/><path d="M12 12l2 2-2 2-2-2 2-2z" fill="${svgColor}"/></svg>`,
     treeView: `<svg viewBox="0 0 24 24" stroke="${svgColor}" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="6" height="6" rx="1"/><rect x="4" y="14" width="6" height="6" rx="1"/><rect x="14" y="9" width="6" height="6" rx="1"/><path d="M10 7h4M10 17h4M14 12V7M14 12v5"/></svg>`,
     toggleMode: `<svg viewBox="0 0 24 24" stroke="${svgColor}" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 9h6v6H9z" class="toggle-normal"/><circle cx="12" cy="12" r="3" class="toggle-hover" style="display: none;"/></svg>`,
-    close: `<svg viewBox="0 0 24 24" stroke="${svgColor}" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M17 7L7 17M7 7l10 10"/></svg>`
+    close: `<svg viewBox="0 0 24 24" stroke="${svgColor}" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M17 7L7 17M7 7l10 10"/></svg>`,
+    placeRight: `<svg viewBox="0 0 24 24" stroke="${svgColor}" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="7" height="12" rx="1"/><rect x="14" y="8" width="7" height="8" rx="1"/><path d="M12 12h2"/></svg>`,
+    placeBelow: `<svg viewBox="0 0 24 24" stroke="${svgColor}" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="3" width="12" height="7" rx="1"/><rect x="8" y="14" width="8" height="7" rx="1"/><path d="M12 12v2"/></svg>`
 };
 
 export const STYLES = `

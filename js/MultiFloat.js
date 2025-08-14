@@ -1,4 +1,5 @@
 import { app } from "../../scripts/app.js";
+import { preventNodeDrag } from "./dragHelper.js";
 
 class MultiFloatNode {
     constructor(node) {
@@ -39,6 +40,15 @@ class MultiFloatNode {
         this.updateColors(node.properties.startColor || "#423438", node.properties.slidercolor || "#69414e");
         this.updateSliderCount(node.properties.sliderCount || 3);
         this.calculateConstants();
+        
+        // Instance-level onMouseDown to handle slider interactions cleanly
+        this.node.onMouseDown = function(e, pos) {
+            if (this.flags.collapsed) return false;
+
+            if (this.multiFloat.checkSliderInteraction(pos)) return true;
+
+            return this.multiFloat.checkSliderCountButtons(pos);
+        }.bind(this.node);
     }
 
     calculateConstants() {

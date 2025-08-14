@@ -106,6 +106,55 @@ app.registerExtension({
             this.serialize_widgets = true;
             this.onConnectionsChange = this._handleConnectionsChange.bind(this);
             
+            // Instance-level onMouseDown for edit/refresh controls and dialog
+            this.onMouseDown = function(e, local_pos) {
+                if (!local_pos) return false;
+                
+                // Edit button
+                if (this.editButtonBounds && UI_HELPERS.isInBounds(local_pos[0], local_pos[1], this.editButtonBounds)) {
+                    this.openFlareDialog();
+                    return true;
+                }
+                
+                // Dialog interactions
+                if (this.dialog && this.dialog.isOpen) {
+                    return true; // Prevent dragging in dialog area
+                }
+                
+                // Refresh button
+                if (this.refreshButtonBounds) {
+                    const distance = Math.sqrt(
+                        Math.pow(local_pos[0] - this.refreshButtonBounds.centerX, 2) + 
+                        Math.pow(local_pos[1] - this.refreshButtonBounds.centerY, 2)
+                    );
+                    if (distance <= this.refreshButtonBounds.radius) {
+                        const inputLink = this.getInputLink(0);
+                        if (inputLink) {
+                            const inputNode = this.graph.getNodeById(inputLink.origin_id);
+                            if (inputNode) {
+                                if (inputNode.imgs && inputNode.imgs.length > 0) {
+                                    this.currentImage = inputNode.imgs[0];
+                                    this._initializeDefaultSettingsIfNeeded();
+                                    this.setDirtyCanvas(true);
+                                } else if (inputNode.imageData) {
+                                    const img = new Image();
+                                    img.onload = () => {
+                                        this.currentImage = img;
+                                        this._initializeDefaultSettingsIfNeeded();
+                                        this.setDirtyCanvas(true);
+                                    };
+                                    img.onerror = () => console.error("Preview image load error");
+                                    img.src = inputNode.imageData;
+                                }
+                            }
+                        }
+                        return true;
+                    }
+                }
+                
+                return false; // Allow dragging in empty areas
+            }.bind(this);
+            
             return r;
         };
 
@@ -183,20 +232,23 @@ app.registerExtension({
 
 
         nodeType.prototype._handleConnectionsChange = function() {
+            if (!this.graph) {
+                return;
+            }
             const inputLink = this.getInputLink(0);
             if (inputLink) {
-                const inputNode = this.graph.getNodeById(inputLink.origin_id);
+                const inputNode = this.graph ? this.graph.getNodeById(inputLink.origin_id) : null;
                 if (inputNode) {
                     if (inputNode.imgs && inputNode.imgs.length > 0) {
                         this.currentImage = inputNode.imgs[0];
                         this._initializeDefaultSettingsIfNeeded();
-                        this.setDirtyCanvas(true);
+                        if (this.graph) this.setDirtyCanvas(true);
                     } else if (inputNode.imageData) {
                         const img = new Image();
                         img.onload = () => {
                             this.currentImage = img;
                             this._initializeDefaultSettingsIfNeeded();
-                            this.setDirtyCanvas(true);
+                            if (this.graph) this.setDirtyCanvas(true);
                         };
                         img.onerror = () => console.error("Preview image load error");
                         img.src = UI_HELPERS.imageDataToUrl(inputNode.imageData);
@@ -205,7 +257,7 @@ app.registerExtension({
             } else {
                 this.currentImage = null;
                 this.imgs = [];
-                this.setDirtyCanvas(true);
+                if (this.graph) this.setDirtyCanvas(true);
             }
         };
 
@@ -1287,7 +1339,7 @@ app.registerExtension({
 
 
         nodeType.prototype.drawPreviewArea = function(ctx) {
-            if (!this.currentImage || !this.size || this.size[1] <= 0) return;
+            if (!this.size || this.size[1] <= 0) return;
 
             const { PADDING, HEADER_HEIGHT } = this.UI_CONSTANTS;
             const buttonHeight = 40; 
@@ -1300,6 +1352,12 @@ app.registerExtension({
             };
 
             if (previewArea.height <= 0) return;
+
+            
+            if (!this.currentImage) {
+                this.drawEmptyStatePlaceholder(ctx, previewArea);
+                return;
+            }
 
             const imageAspect = this.currentImage.width / this.currentImage.height;
             const previewAspect = previewArea.width / previewArea.height;
@@ -1384,6 +1442,43 @@ app.registerExtension({
                     this.graph.change();
                 }
             }
+        };
+
+        
+        nodeType.prototype.drawEmptyStatePlaceholder = function(ctx, previewArea) {
+            ctx.save();
+            
+            ctx.beginPath();
+            ctx.roundRect(previewArea.x, previewArea.y, previewArea.width, previewArea.height, 8);
+            ctx.fillStyle = "rgba(255,255,255,0.02)";
+            ctx.fill();
+
+            ctx.strokeStyle = "rgba(255,255,255,0.08)";
+            ctx.setLineDash([6, 4]);
+            ctx.stroke();
+            ctx.setLineDash([]);
+
+            const cx = previewArea.x + previewArea.width / 2;
+            const cy = previewArea.y + previewArea.height / 2;
+            const r = Math.min(previewArea.width, previewArea.height) * 0.12;
+
+            ctx.strokeStyle = "rgba(130, 170, 255, 0.7)";
+            ctx.lineWidth = 1.5;
+            ctx.beginPath();
+            ctx.arc(cx, cy, r, 0, Math.PI * 2);
+            ctx.stroke();
+
+            for (let i = 0; i < 6; i++) {
+                const angle = i * Math.PI / 3;
+                ctx.beginPath();
+                ctx.moveTo(cx + Math.cos(angle) * (r + 2), cy + Math.sin(angle) * (r + 2));
+                ctx.lineTo(cx + Math.cos(angle) * (r + 10), cy + Math.sin(angle) * (r + 10));
+                ctx.stroke();
+            }
+
+            
+
+            ctx.restore();
         };
 
         

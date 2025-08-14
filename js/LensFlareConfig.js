@@ -1355,7 +1355,7 @@ export const LENS_CHARACTERISTICS = {
     }
 };
 
-// Yardımcı fonksiyonlar - LensFlareNode.js'den taşındı
+// Helper functions - moved from LensFlareNode.js
 export const FORMAT_HELPERS = {
     _valueCache: new Map(),
     
@@ -1416,9 +1416,9 @@ let _conversionCtx = null;
 // Dust pattern cache for expensive generation
 const _dustPatternCache = new Map();
 
-// Global yardımcı fonksiyonlar
+// Global helper functions
 export const UI_HELPERS = {
-    // Image data'yı URL'e dönüştürme
+    // Convert ImageData to a data URL
     imageDataToUrl: (data) => {
         if (!_conversionCanvas) {
             _conversionCanvas = document.createElement('canvas');
@@ -1435,7 +1435,7 @@ export const UI_HELPERS = {
         return _conversionCanvas.toDataURL('image/png');
     },
     
-    // Bir pozisyonun belirli bir alan içinde olup olmadığını kontrol etme
+    // Check whether a position is inside a given area
     isInBounds: (x, y, area) => {
         return x >= area.x && 
                x <= area.x + area.width && 
@@ -1512,10 +1512,10 @@ export const UI_HELPERS = {
                     amplitude *= PERSISTENCE;
                 }
 
-                // Gürültü değerini [0, 1] aralığına normalize edelim
+        // Normalize noise value into the [0, 1] range
                 value = Math.max(0, Math.min(1, value / DETAIL_LEVELS));
                 
-                // Threshold filtresi optimize edilmiş versiyonu
+        // Optimized threshold filter
                 const alpha = value > threshold ? (value - threshold) * invThreshold : 0;
                 
                 data[index] = 255;     // R

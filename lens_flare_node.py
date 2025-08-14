@@ -44,5 +44,5 @@ NODE_CLASS_MAPPINGS = {
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
-    "LensFlare": "Lens Flare Effect (Beta)"
+    "LensFlare": "Lens Flare Effect"
 } 

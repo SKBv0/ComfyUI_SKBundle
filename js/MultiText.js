@@ -125,13 +125,157 @@ const MultiTextNode = {
         this.activePrompts = parseInt(localStorage.getItem('multitext_prompt_count')) || 2;
         this.maxPrompts = 20;
         this.isSinglePromptMode = localStorage.getItem('multitext_single_prompt') === "true";
+        this.separatorValue = localStorage.getItem('multitext_separator') || ', ';
         this.tooltipState = { visible: false, text: '', x: 0, y: 0 };
         this.currentHoverIndex = -1;
         this.applyPromptMode();
         this.updateNodeSize();
+        
+        setTimeout(() => this.syncSeparatorWidget(), 100);
         this.loadFonts();
         this.loadSavedTemplates();
         this.loadSavedPresets();
+        
+        // Instance-level onMouseDown to handle control buttons without dragging
+        this.onMouseDown = function(event, pos, ctx) {
+            if (event.button === 0) {
+                const controls = this.isInsideControlButtons(pos[0], pos[1]);
+                if (controls.add) {
+                    this.addPrompt();
+                    return true;
+                } else if (controls.remove) {
+                    this.removePrompt();
+                    return true;
+                } else if (controls.toggle) { 
+                    this.isSinglePromptMode = !this.isSinglePromptMode;
+                    localStorage.setItem('multitext_single_prompt', this.isSinglePromptMode); 
+                    this.applyPromptMode(); 
+                    this.setDirtyCanvas(true);
+                    return true;
+                } else if (controls.separator) {
+                    const separatorMenu = document.createElement('div');
+                    separatorMenu.classList.add('multitext-separator-menu');
+                    const title = document.createElement('div');
+                    title.textContent = 'Select Separator';
+                    title.classList.add('multitext-separator-title');
+                    separatorMenu.appendChild(title);
+                    const menuItems = [
+                        { label: 'Space', value: ' ', icon: '⎵' },
+                        { label: 'Comma', value: ',', icon: ',' }, 
+                        { label: 'Comma + Space', value: ', ', icon: ', ' },
+                        { label: 'New Line', value: '\\n', icon: '↵' },
+                        { label: 'Custom...', value: 'custom', icon: '✏️' }
+                    ];
+                    menuItems.forEach(item => {
+                        const menuItem = document.createElement('div');
+                        menuItem.classList.add('multitext-separator-item');
+                        const icon = document.createElement('span');
+                        icon.textContent = item.icon;
+                        icon.classList.add('multitext-separator-icon');
+                        const label = document.createElement('span');
+                        label.textContent = item.label;
+                        label.classList.add('multitext-separator-label');
+                        menuItem.appendChild(icon);
+                        menuItem.appendChild(label);
+                        if (this.separatorValue === item.value) {
+                            menuItem.classList.add('selected');
+                        }
+                        menuItem.onclick = () => {
+                            if (item.value === 'custom') {
+                                const customInput = document.createElement('input');
+                                customInput.type = 'text';
+                                customInput.classList.add('multitext-separator-custom-input');
+                                customInput.placeholder = 'Enter custom separator...';
+                                customInput.maxLength = 10;
+                                customInput.style.cssText = `
+                                    color: ${THEME.colors.text};
+                                    background: ${THEME.colors.bgActive};
+                                    border: 1px solid ${THEME.colors.border};
+                                    border-radius: 4px;
+                                    padding: 6px;
+                                    margin: 8px 0 4px 0;
+                                    width: 100%;
+                                    font-family: ${THEME.typography.fonts.primary};
+                                    font-size: 12px;
+                                `;
+                                customInput.value = this.separatorValue;
+                                separatorMenu.innerHTML = '';
+                                separatorMenu.appendChild(title);
+                                separatorMenu.appendChild(customInput);
+                                customInput.focus();
+                                customInput.onkeydown = (e) => {
+                                    if (e.key === 'Enter') {
+                                        this.separatorValue = customInput.value;
+                                        this.setDirtyCanvas(true);
+                                        if (app.graph) {
+                                            app.graph.change();
+                                            app.graph.setDirtyCanvas(true);
+                                        }
+                                        separatorMenu.remove();
+                                    } else if (e.key === 'Escape') {
+                                        separatorMenu.remove();
+                                    }
+                                };
+                            } else {
+                                this.separatorValue = item.value === '\\n' ? '\n' : item.value;
+                                localStorage.setItem('multitext_separator', this.separatorValue);
+                                this.setDirtyCanvas(true);
+                                if (app.graph) {
+                                    app.graph.change();
+                                    app.graph.setDirtyCanvas(true);
+                                }
+                                separatorMenu.remove();
+                            }
+                        };
+                        separatorMenu.appendChild(menuItem);
+                    });
+                    const mouseX = event.clientX || event.pageX || window.event?.clientX || pos[0];
+                    const mouseY = event.clientY || event.pageY || window.event?.clientY || pos[1];
+                    separatorMenu.style.left = `${mouseX}px`;
+                    separatorMenu.style.top = `${mouseY + 20}px`;
+                    const closeMenu = (e) => {
+                        if (!separatorMenu.contains(e.target)) {
+                            separatorMenu.remove();
+                            document.removeEventListener('mousedown', closeMenu);
+                        }
+                    };
+                    document.addEventListener('mousedown', closeMenu);
+                    document.body.appendChild(separatorMenu);
+                    const menuRect = separatorMenu.getBoundingClientRect();
+                    if (menuRect.right > window.innerWidth) {
+                        separatorMenu.style.left = `${window.innerWidth - menuRect.width - 10}px`;
+                    }
+                    if (menuRect.bottom > window.innerHeight) {
+                        separatorMenu.style.top = `${window.innerHeight - menuRect.height - 10}px`;
+                    }
+                    return true;
+                }
+                const index = this.getHoveredWidgetIndex(pos);
+                if (index !== -1 && index < this.activePrompts) {
+                    if (this.isInsideToggle(pos, index)) {
+                        this.togglePromptRow(index);
+                        return true;
+                    }            
+                    this.showEditDialog(index + 1);
+                    return true;
+                }
+            }
+            return false;
+        }.bind(this);
+    },
+    syncSeparatorWidget() {
+        if (this.widgets) {
+            const separatorWidget = this.widgets.find(w => w.name === "separator");
+            if (separatorWidget && this.separatorValue) {
+                separatorWidget.value = this.separatorValue;
+                separatorWidget._value = this.separatorValue;
+                this.setWidgetValue(separatorWidget, this.separatorValue);
+                if (separatorWidget.callback) {
+                    separatorWidget.callback(this.separatorValue);
+                }
+                this.setDirtyCanvas(true);
+            }
+        }
     },
     loadSavedTemplates() {
         try {
@@ -247,7 +391,7 @@ const MultiTextNode = {
         }
         this.setDirtyCanvas(true);
     },    
-    onMouseDown(event, pos, ctx) {
+    _onMouseDown_disabled(event, pos, ctx) {
         if (event.button === 0) {
             const controls = this.isInsideControlButtons(pos[0], pos[1]);
             if (controls.add) {
@@ -312,11 +456,10 @@ const MultiTextNode = {
                             customInput.focus();
                             const applyCustomSeparator = () => {
                                 const customValue = customInput.value;
-                                if (customValue && this.separator?.widget) {
-                                    this.separator.widget.value = customValue;
-                                    if (this.separator.widget.callback) {
-                                        this.separator.widget.callback(customValue);
-                                    }
+                                if (customValue) {
+                                    this.separatorValue = customValue;
+                                    localStorage.setItem('multitext_separator', customValue);
+                                    this.syncSeparatorWidget();
                                     this.setDirtyCanvas(true);
                                     if (app.graph) {
                                         app.graph.change();
@@ -335,6 +478,7 @@ const MultiTextNode = {
                             };
                         } else {
                             this.separatorValue = item.value === '\\n' ? '\n' : item.value;
+                            localStorage.setItem('multitext_separator', this.separatorValue);
                             this.setDirtyCanvas(true);
                             if (app.graph) {
                                 app.graph.change();
@@ -345,9 +489,10 @@ const MultiTextNode = {
                     };
                     separatorMenu.appendChild(menuItem);
                 });
-                const rect = ctx.canvas.getBoundingClientRect();
-                separatorMenu.style.left = `${rect.left + pos[0]}px`;
-                separatorMenu.style.top = `${rect.top + pos[1]}px`;
+                const mouseX = event.clientX || event.pageX || window.event?.clientX || pos[0];
+                const mouseY = event.clientY || event.pageY || window.event?.clientY || pos[1];
+                separatorMenu.style.left = `${mouseX}px`;
+                separatorMenu.style.top = `${mouseY + 20}px`;
                 const closeMenu = (e) => {
                     if (!separatorMenu.contains(e.target)) {
                         separatorMenu.remove();
@@ -374,9 +519,8 @@ const MultiTextNode = {
                     this.showEditDialog(index + 1);
                 }
             }
-            return false;              
-          },
-          isInsideToggle(pos, rowIndex) {
+        },
+        isInsideToggle(pos, rowIndex) {
             const margin = THEME.layout.promptRow.padding;
             const rowHeight = THEME.layout.promptRow.height;
             const rowMargin = THEME.layout.promptRow.margin;
@@ -1467,11 +1611,17 @@ const MultiTextNode = {
             o.widgets_values = [];
         }
         o.active_prompts = this.activePrompts;
+        o.separator_value = this.separatorValue;
     },
     onConfigure(o) {
         if (o.active_prompts !== undefined) {
             this.activePrompts = o.active_prompts;
             localStorage.setItem('multitext_prompt_count', this.activePrompts.toString());
+        }
+        if (o.separator_value !== undefined) {
+            this.separatorValue = o.separator_value;
+            localStorage.setItem('multitext_separator', o.separator_value);
+            setTimeout(() => this.syncSeparatorWidget(), 100);
         }
         this.updateNodeSize();
     },

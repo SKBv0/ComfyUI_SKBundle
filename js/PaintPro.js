@@ -15,7 +15,9 @@ import {
     PERFORMANCE_LIMITS,
     COLOR_PICKER,
     TEXT_CONFIG,
-    INTERACTION_CONFIG
+    INTERACTION_CONFIG,
+    REFRESH_BUTTON,
+    FULLSCREEN_BUTTON
 } from "./paintConstants.js";
 import { 
     AdvancedBrush, 
@@ -29,6 +31,8 @@ import {
     ColorUtils 
 } from "./paintTools.js";
 import { SettingsManager } from "./paintSettings.js";
+import { UI_HELPERS } from "./LensFlareConfig.js";
+import { preventNodeDragWithCanvas } from "./dragHelper.js";
 
 
 if (!document.getElementById('paint-pro-styles')) {
@@ -36,7 +40,7 @@ if (!document.getElementById('paint-pro-styles')) {
     style.id = 'paint-pro-styles';
     style.textContent = `
 .paint-pro-settings-popup {
-    z-index: 99999 !important;
+    z-index: 1000002 !important;
     background: #1a1a1a !important;
     border: 1px solid #333 !important;
     border-radius: 6px !important;
@@ -67,6 +71,29 @@ if (!document.getElementById('paint-pro-styles')) {
 .paint-pro-settings-popup input[type="range"]::-webkit-slider-thumb:active {
     background: #3A8EFF !important;
     transform: scale(0.95) !important;
+}
+
+/* Minimal tooltips */
+[title]:hover::after {
+    content: attr(title);
+    position: absolute;
+    background: rgba(0,0,0,0.8);
+    color: white;
+    padding: 3px 6px;
+    font-size: 10px;
+    border-radius: 3px;
+    white-space: nowrap;
+    z-index: 1000000;
+    pointer-events: none;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+}
+
+/* Hide tooltips in fullscreen */
+body:fullscreen [title]:hover::after,
+:fullscreen [title]:hover::after {
+    display: none !important;
 }
 `;
     document.head.appendChild(style);
@@ -107,6 +134,127 @@ app.registerExtension({
         const onNodeCreated = nodeType.prototype.onNodeCreated;
         nodeType.prototype.onNodeCreated = function() {
             const r = onNodeCreated ? onNodeCreated.apply(this, arguments) : undefined;
+            
+            // Setup drag prevention using helper module
+            preventNodeDragWithCanvas(this, {
+                areas: {
+                    toolbar: () => {
+                        const metrics = this._getScaledToolbarMetrics();
+                        return {
+                            x: 0,
+                            y: 0,
+                            width: metrics.toolbarWidth * 1.2,
+                            height: this.size[1]
+                        };
+                    },
+                    controls: () => this.getQuickControlsBarBounds(),
+                    refresh: () => this.refreshButtonBounds,
+                    fullscreen: () => this.fullscreenButtonBounds,
+                    canvas: () => this.getCanvasArea()
+                },
+                onToolbarClick: (e, pos) => {
+                    return this._handleToolbarMouseDown(pos);
+                },
+                onControlsClick: (e, pos) => {
+                    return this._handleQuickControlsMouseDown(e, pos);
+                },
+                onRefreshClick: (e, pos) => {
+                    this._handleRefreshClick();
+                    return true;
+                },
+                onFullscreenClick: (e, pos) => {
+                    this._handleFullscreenClick();
+                    return true;
+                },
+                onHistoryClick: (e, pos) => {
+                    this._handleHistoryClick();
+                    return true;
+                },
+                onCanvasClick: (e, pos) => {
+                    
+                    const [x, y] = this.getLocalMousePosition(pos);
+                    switch(this.canvasState.tool) {
+                        case PAINT_TOOLS.EYEDROPPER:
+                            const combined = this.createCombinedContext(x, y, this.canvasState.eyedropperSampleSize || 5);
+                            if (combined && combined.ctx) {
+                                const pickX = combined.size / 2;
+                                const pickY = combined.size / 2;
+                                const pickedColor = EyedropperTool.pick(combined.ctx, pickX, pickY, this.canvasState);
+                                this.canvasState.color = pickedColor;
+                                if (this.showSettings && this.settingsManager) {
+                                    this.settingsManager.updateSettings(this.canvasState.tool);
+                                }
+                                this.setDirtyCanvas(true, true);
+                                this.canvasState.tool = this.canvasState.previousTool || PAINT_TOOLS.BRUSH;
+                                if (this.showSettings && this.settingsManager) {
+                                    this.settingsManager.updateSettings(this.canvasState.tool);
+                                }
+                            }
+                            break;
+                        case PAINT_TOOLS.FILL:
+                            const ctxFill = (this.canvasState.tool === PAINT_TOOLS.MASK || 
+                                (this.properties.showMask && this.canvasState.tool === PAINT_TOOLS.ERASER))
+                                ? this.maskCtx
+                                : this.drawingCtx;
+                            const fillColor = ColorUtils.hexToRgb(this.canvasState.color);
+                            const targetColor = [fillColor.r, fillColor.g, fillColor.b, 255];
+                            FillTool.fill(ctxFill, Math.floor(x), Math.floor(y), targetColor, 
+                                this.canvasState.fillTolerance || TOOL_SETTINGS.FILL.DEFAULT_TOLERANCE);
+                            this.saveToHistory();
+                            this.updateCanvasWidget();
+                            this.setDirtyCanvas(true);
+                            break;
+                        case PAINT_TOOLS.LINE:
+                        case PAINT_TOOLS.RECTANGLE:
+                        case PAINT_TOOLS.CIRCLE:
+                        case PAINT_TOOLS.GRADIENT:
+                            this.canvasState.isDrawing = true;
+                            this.canvasState.startX = x;
+                            this.canvasState.startY = y;
+                            this.canvasState.lastX = x;
+                            this.canvasState.lastY = y;
+                            this.setDirtyCanvas(true);
+                            break;
+                        case PAINT_TOOLS.BRUSH:
+                        case PAINT_TOOLS.ERASER:
+                        case PAINT_TOOLS.MASK:
+                            this.canvasState.isDrawing = true;
+                            this.canvasState.startX = x;
+                            this.canvasState.startY = y;
+                            this.canvasState.lastX = x;
+                            this.canvasState.lastY = y;
+                            
+                            let rawPressure = 0.5; 
+                            if (e && typeof e.pressure === 'number' && e.pressure >= 0 && e.pressure <= 1) {
+                                rawPressure = e.pressure;
+                            } else if (e && e.pointerType === 'pen' && typeof e.pressure === 'number') {
+                                rawPressure = e.pressure;
+                            } else if (e && e.originalEvent && typeof e.originalEvent.pressure === 'number') {
+                                rawPressure = e.originalEvent.pressure;
+                            }
+                            const initialPressure = this.calculatePressure(rawPressure);
+                            this.canvasState.lastPoints = [{ 
+                                x, y, time: performance.now(), 
+                                pressure: initialPressure 
+                            }];
+                            this.canvasState.strokePoints = [{ 
+                                x, y, time: performance.now(), 
+                                pressure: initialPressure 
+                            }];
+                            this.startToolAction(x, y);
+                            this.setDirtyCanvas(true);
+                            this._hasMovedSinceDown = false;
+                            if (this._clickReleaseTimeout) clearTimeout(this._clickReleaseTimeout);
+                            this._clickReleaseTimeout = setTimeout(() => {
+                                if (this.canvasState && this.canvasState.isDrawing && !this._hasMovedSinceDown) {
+                                    this.onMouseUp(e, pos);
+                                }
+                            }, 50);
+                            break;
+                    }
+                    return true;
+                }
+            });
             this._initializeNode();
             this._initializeWidgets();
             this.internalCanvasImageWidget = this.widgets ? this.widgets.find(w => w.name === 'canvas_image') : null;
@@ -413,6 +561,90 @@ app.registerExtension({
                 alpha: true
             });
             this.isDrawingContinuousStroke = false;
+            
+            // Initialize refresh button bounds
+            this.refreshButtonBounds = {
+                x: 0, y: 0, width: REFRESH_BUTTON.SIZE, height: REFRESH_BUTTON.SIZE
+            };
+            
+            // Initialize fullscreen button bounds
+            this.fullscreenButtonBounds = {
+                x: 0, y: 0, width: FULLSCREEN_BUTTON.SIZE, height: FULLSCREEN_BUTTON.SIZE
+            };
+            this.isFullscreen = false;
+            
+            
+            // Update button positions immediately
+            this.updateButtonPositions = function() {
+                this.refreshButtonBounds.x = this.size[0] - REFRESH_BUTTON.SIZE - REFRESH_BUTTON.MARGIN;
+                this.refreshButtonBounds.y = this.size[1] - REFRESH_BUTTON.SIZE - REFRESH_BUTTON.MARGIN;
+                
+                this.fullscreenButtonBounds.x = this.size[0] - (FULLSCREEN_BUTTON.SIZE * 2) - (FULLSCREEN_BUTTON.MARGIN * 2) - 5;
+                this.fullscreenButtonBounds.y = this.size[1] - FULLSCREEN_BUTTON.SIZE - FULLSCREEN_BUTTON.MARGIN;
+                
+            }.bind(this);
+            this.updateButtonPositions();
+            
+            const self = this;
+            setTimeout(function() {
+                if (self.loadInputImage) {
+                    self.loadInputImage();
+                }
+            }, 200);
+            
+            // Backup call in case the first one doesn't work
+            setTimeout(function() {
+                console.log('Backup loadInputImage call...');
+                if (self.loadInputImage) {
+                    self.loadInputImage();
+                } else {
+                    console.log('loadInputImage function not found in backup!');
+                }
+            }, 1000);
+            
+            setTimeout(() => {
+                this.loadCanvasState();
+            }, 100);
+        };
+        
+        nodeType.prototype.loadInputImage = function() {
+            console.log('Loading input image...');
+            const inputLink = this.getInputLink(0);
+            console.log('Input link:', inputLink);
+            
+            if (inputLink) {
+                const inputNode = this.graph.getNodeById(inputLink.origin_id);
+                console.log('Input node:', inputNode);
+                
+                if (inputNode) {
+                    if (inputNode.imgs && inputNode.imgs.length > 0) {
+                        console.log('Using inputNode.imgs[0]');
+                        this.currentImage = inputNode.imgs[0];
+                        this._resizeCanvases(this.currentImage.naturalWidth, this.currentImage.naturalHeight);
+                        this.setDirtyCanvas(true, true);
+                    } else if (inputNode.imageData) {
+                        console.log('Using inputNode.imageData');
+                        const img = new Image();
+                        img.onload = () => {
+                            this.currentImage = img;
+                            this._resizeCanvases(img.naturalWidth, img.naturalHeight);
+                            this.setDirtyCanvas(true, true);
+                        };
+                        img.src = inputNode.imageData;
+                    } else {
+                        console.log('No input image data found, retrying in 500ms...');
+                        setTimeout(() => this.loadInputImage(), 500);
+                    }
+                } else {
+                    console.log('Input node not found');
+                }
+            } else {
+                console.log('No input link, using fallback image');
+                this.currentImage = this.createFallbackImage(512, 512);
+            }
+        };
+
+        nodeType.prototype.loadCanvasState = function() {
         };
         nodeType.prototype._resizeCanvases = function(width, height) {
             if (width <= 0 || height <= 0 || width > 4096 || height > 4096) {
@@ -622,7 +854,291 @@ app.registerExtension({
             if (!this.canvasState?.isDrawing && this.lastMousePos) {
                 this.updateCanvasCursor();
             }
+            
+            // Draw refresh button
+            this._drawRefreshButton(ctx);
+            
+            // Draw fullscreen button
+            this._drawFullscreenButton(ctx);
+            
         };
+        
+        nodeType.prototype._drawRefreshButton = function(ctx) {
+            // Update button position
+            this.refreshButtonBounds.x = this.size[0] - REFRESH_BUTTON.SIZE - REFRESH_BUTTON.MARGIN;
+            this.refreshButtonBounds.y = this.size[1] - REFRESH_BUTTON.SIZE - REFRESH_BUTTON.MARGIN;
+            
+            ctx.save();
+            
+            // Draw modern button background with gradient
+            const gradient = ctx.createLinearGradient(
+                this.refreshButtonBounds.x,
+                this.refreshButtonBounds.y,
+                this.refreshButtonBounds.x,
+                this.refreshButtonBounds.y + REFRESH_BUTTON.SIZE
+            );
+            gradient.addColorStop(0, 'rgba(60, 60, 60, 0.9)');
+            gradient.addColorStop(1, 'rgba(40, 40, 40, 0.9)');
+            
+            ctx.fillStyle = gradient;
+            ctx.beginPath();
+            ctx.roundRect(
+                this.refreshButtonBounds.x, 
+                this.refreshButtonBounds.y, 
+                REFRESH_BUTTON.SIZE, 
+                REFRESH_BUTTON.SIZE,
+                4
+            );
+            ctx.fill();
+            
+            // Draw subtle border
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
+            ctx.lineWidth = 1;
+            ctx.stroke();
+            
+            // Draw refresh icon with better styling
+            ctx.fillStyle = '#E0E0E0';
+            ctx.font = 'bold 12px system-ui, -apple-system, sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            
+            // Add subtle shadow for icon
+            ctx.shadowColor = 'rgba(0, 0, 0, 0.3)';
+            ctx.shadowBlur = 1;
+            ctx.shadowOffsetY = 1;
+            
+            ctx.fillText(
+                REFRESH_BUTTON.ICON,
+                this.refreshButtonBounds.x + REFRESH_BUTTON.SIZE / 2,
+                this.refreshButtonBounds.y + REFRESH_BUTTON.SIZE / 2
+            );
+            
+            // Reset shadow
+            ctx.shadowColor = 'transparent';
+            ctx.shadowBlur = 0;
+            ctx.shadowOffsetY = 0;
+            
+            ctx.restore();
+        };
+        
+        nodeType.prototype._drawFullscreenButton = function(ctx) {
+            if (!this.fullscreenButtonBounds) return;
+            
+            ctx.save();
+            
+            this.fullscreenButtonBounds.x = this.size[0] - (FULLSCREEN_BUTTON.SIZE * 2) - (FULLSCREEN_BUTTON.MARGIN * 2) - 5;
+            this.fullscreenButtonBounds.y = this.size[1] - FULLSCREEN_BUTTON.SIZE - FULLSCREEN_BUTTON.MARGIN;
+            
+            const gradient = ctx.createLinearGradient(
+                this.fullscreenButtonBounds.x,
+                this.fullscreenButtonBounds.y,
+                this.fullscreenButtonBounds.x,
+                this.fullscreenButtonBounds.y + FULLSCREEN_BUTTON.SIZE
+            );
+            gradient.addColorStop(0, 'rgba(60, 60, 60, 0.9)');
+            gradient.addColorStop(1, 'rgba(40, 40, 40, 0.9)');
+            
+            ctx.fillStyle = gradient;
+            ctx.beginPath();
+            ctx.roundRect(
+                this.fullscreenButtonBounds.x, 
+                this.fullscreenButtonBounds.y, 
+                FULLSCREEN_BUTTON.SIZE, 
+                FULLSCREEN_BUTTON.SIZE,
+                4
+            );
+            ctx.fill();
+            
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
+            ctx.lineWidth = 1;
+            ctx.stroke();
+            
+            ctx.fillStyle = '#E0E0E0';
+            ctx.font = 'bold 12px system-ui, -apple-system, sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            
+            ctx.shadowColor = 'rgba(0, 0, 0, 0.3)';
+            ctx.shadowBlur = 1;
+            ctx.shadowOffsetY = 1;
+            
+            ctx.fillText(
+                FULLSCREEN_BUTTON.ICON,
+                this.fullscreenButtonBounds.x + FULLSCREEN_BUTTON.SIZE / 2,
+                this.fullscreenButtonBounds.y + FULLSCREEN_BUTTON.SIZE / 2
+            );
+            
+            ctx.shadowColor = 'transparent';
+            ctx.shadowBlur = 0;
+            ctx.shadowOffsetY = 0;
+            
+            ctx.restore();
+        };
+        
+        nodeType.prototype._handleRefreshClick = function() {
+            const inputLink = this.getInputLink(0);
+            if (inputLink) {
+                const inputNode = this.graph.getNodeById(inputLink.origin_id);
+                if (inputNode) {
+                    if (inputNode.imgs && inputNode.imgs.length > 0) {
+                        this.currentImage = inputNode.imgs[0];
+                        this._resizeCanvases(this.currentImage.naturalWidth, this.currentImage.naturalHeight);
+                        this.setDirtyCanvas(true, true);
+                    } else if (inputNode.imageData) {
+                        const img = new Image();
+                        img.onload = () => {
+                            this.currentImage = img;
+                            this._resizeCanvases(img.naturalWidth, img.naturalHeight);
+                            this.setDirtyCanvas(true, true);
+                            };
+                        img.src = imageDataToUrl(inputNode.imageData);
+                    }
+                }
+            }
+        };
+        
+        nodeType.prototype._handleFullscreenClick = function() {
+            this.toggleFullscreen();
+        };
+        
+        
+        
+        nodeType.prototype.toggleFullscreen = function() {
+            if (this.fullscreenContainer) {
+                this.exitFullscreen();
+                return;
+            }
+            
+            this.fullscreenContainer = document.createElement('div');
+            this.fullscreenContainer.style.cssText = `
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100vw;
+                height: 100vh;
+                background: rgba(0, 0, 0, 0.9);
+                z-index: 999999;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+            `;
+            
+            const scale = Math.min(
+                (window.innerWidth - 100) / this.size[0],
+                (window.innerHeight - 100) / this.size[1],
+                4
+            );
+            
+            const canvas = document.createElement('canvas');
+            const scaledWidth = this.size[0] * scale;
+            const scaledHeight = this.size[1] * scale;
+            
+            canvas.width = scaledWidth;
+            canvas.height = scaledHeight;
+            canvas.style.cssText = `
+                display: block;
+                background: #2a2a2a;
+                border: 2px solid #444;
+            `;
+            
+            const ctx = canvas.getContext('2d');
+            ctx.scale(scale, scale);
+            
+            this.fullscreenCanvas = canvas;
+            this.fullscreenCtx = ctx;
+            this.fullscreenScale = scale;
+            
+            this.refreshFullscreenCanvas();
+            this.setupFullscreenInteraction(canvas);
+            
+            const exitBtn = document.createElement('button');
+            exitBtn.innerHTML = '✕ Exit';
+            exitBtn.style.cssText = `
+                position: absolute;
+                top: 20px;
+                right: 20px;
+                padding: 10px 20px;
+                background: #444;
+                color: white;
+                border: none;
+                border-radius: 4px;
+                cursor: pointer;
+                z-index: 1000001;
+            `;
+            exitBtn.onclick = () => this.exitFullscreen();
+            
+            this.fullscreenContainer.appendChild(canvas);
+            this.fullscreenContainer.appendChild(exitBtn);
+            document.body.appendChild(this.fullscreenContainer);
+        };
+        
+        nodeType.prototype.refreshFullscreenCanvas = function() {
+            if (!this.fullscreenCtx) return;
+            
+            this.fullscreenCtx.clearRect(0, 0, this.size[0], this.size[1]);
+            
+            if (this.onDrawForeground) {
+                this.onDrawForeground.call(this, this.fullscreenCtx);
+            }
+        };
+
+        nodeType.prototype.setupFullscreenInteraction = function(canvas) {
+            const self = this;
+            let isInteracting = false;
+            
+            const getLocalPos = (e) => {
+                const rect = canvas.getBoundingClientRect();
+                const scaleX = this.size[0] / rect.width;
+                const scaleY = this.size[1] / rect.height;
+                return [
+                    (e.clientX - rect.left) * scaleX,
+                    (e.clientY - rect.top) * scaleY
+                ];
+            };
+            
+            canvas.addEventListener('mousedown', (e) => {
+                isInteracting = true;
+                const pos = getLocalPos(e);
+                
+                if (this.onMouseDown) {
+                    const result = this.onMouseDown.call(this, e, pos);
+                    if (result !== false) {
+                        this.refreshFullscreenCanvas();
+                    }
+                }
+            });
+            
+            canvas.addEventListener('mousemove', (e) => {
+                const pos = getLocalPos(e);
+                
+                if (this.onMouseMove) {
+                    this.onMouseMove.call(this, e, pos);
+                    if (isInteracting) {
+                        this.refreshFullscreenCanvas();
+                    }
+                }
+            });
+            
+            canvas.addEventListener('mouseup', (e) => {
+                isInteracting = false;
+                const pos = getLocalPos(e);
+                
+                if (this.onMouseUp) {
+                    this.onMouseUp.call(this, e, pos);
+                    this.refreshFullscreenCanvas();
+                }
+            });
+        };
+
+        nodeType.prototype.exitFullscreen = function() {
+            if (this.fullscreenContainer) {
+                this.fullscreenContainer.remove();
+                this.fullscreenContainer = null;
+                this.fullscreenCanvas = null;
+            }
+        };
+        
+        
         nodeType.prototype._drawPaletteOverlay = function(ctx, bottomBounds) {
             const graphCanvas = this.graph?.canvas;
             const swatchSize = Math.min(bottomBounds.height - 10, 24);
@@ -1512,126 +2028,23 @@ app.registerExtension({
                 }
             }
         };
-        nodeType.prototype.onMouseDown = function(e, pos) {
-            if (!pos || !pos.length) return;
-            this.lastMousePos = pos; 
-            this._lastInteractionTime = Date.now();
-            const canvasArea = this.getCanvasArea();
-            const isOverCanvas = (
-                pos[0] >= canvasArea.x &&
-                pos[0] <= canvasArea.x + canvasArea.width &&
-                pos[1] >= canvasArea.y &&
-                pos[1] <= canvasArea.y + canvasArea.height
-            );
-            if (this._handleQuickControlsMouseDown(e, pos)) {
-                return; 
-            }
-            if (this._handleToolbarMouseDown(pos)) {
-                return; 
-            }
-            if (isOverCanvas) {
-                e.stopImmediatePropagation();
-                e.preventDefault();
-                e.stopPropagation();
-                const [x, y] = this.getLocalMousePosition(pos);
-                switch(this.canvasState.tool) {
-                    case PAINT_TOOLS.EYEDROPPER:
-                        const combined = this.createCombinedContext(x, y, this.canvasState.eyedropperSampleSize || 5);
-                        if (combined && combined.ctx) {
-                            const pickX = combined.size / 2;
-                            const pickY = combined.size / 2;
-                            const pickedColor = EyedropperTool.pick(combined.ctx, pickX, pickY, this.canvasState);
-                            this.canvasState.color = pickedColor;
-                            if (this.showSettings && this.settingsManager) {
-                                this.settingsManager.updateSettings(this.canvasState.tool);
-                            }
-                            this.setDirtyCanvas(true, true);
-                            this.canvasState.tool = this.canvasState.previousTool || PAINT_TOOLS.BRUSH;
-                            if (this.showSettings && this.settingsManager) {
-                                this.settingsManager.updateSettings(this.canvasState.tool);
-                            }
-                        }
-                        break;
-                    case PAINT_TOOLS.FILL:
-                        const ctxFill = (this.canvasState.tool === PAINT_TOOLS.MASK || 
-                            (this.properties.showMask && this.canvasState.tool === PAINT_TOOLS.ERASER))
-                            ? this.maskCtx
-                            : this.drawingCtx;
-                        const fillColor = ColorUtils.hexToRgb(this.canvasState.color);
-                        const targetColor = [fillColor.r, fillColor.g, fillColor.b, 255];
-                        FillTool.fill(ctxFill, Math.floor(x), Math.floor(y), targetColor, 
-                            this.canvasState.fillTolerance || TOOL_SETTINGS.FILL.DEFAULT_TOLERANCE);
-                        this.saveToHistory();
-                        this.updateCanvasWidget();
-                        this.setDirtyCanvas(true);
-                        break;
-                    case PAINT_TOOLS.LINE:
-                    case PAINT_TOOLS.RECTANGLE:
-                    case PAINT_TOOLS.CIRCLE:
-                    case PAINT_TOOLS.GRADIENT:
-                        this.canvasState.isDrawing = true;
-                        this.canvasState.startX = x;
-                        this.canvasState.startY = y;
-                        this.canvasState.lastX = x;
-                        this.canvasState.lastY = y;
-                        this.setDirtyCanvas(true);
-                        break;
-                    case PAINT_TOOLS.BRUSH:
-                    case PAINT_TOOLS.ERASER:
-                    case PAINT_TOOLS.MASK:
-                        this.canvasState.isDrawing = true;
-                        this.canvasState.startX = x;
-                        this.canvasState.startY = y;
-                        this.canvasState.lastX = x;
-                        this.canvasState.lastY = y;
-                        
-                        let rawPressure = 0.5; 
-                        if (e && typeof e.pressure === 'number' && e.pressure >= 0 && e.pressure <= 1) {
-                            rawPressure = e.pressure;
-                        } else if (e && e.pointerType === 'pen' && typeof e.pressure === 'number') {
-                            rawPressure = e.pressure;
-                        } else if (e && e.originalEvent && typeof e.originalEvent.pressure === 'number') {
-                            rawPressure = e.originalEvent.pressure;
-                        }
-                        const initialPressure = this.calculatePressure(rawPressure);
-                        this.canvasState.lastPoints = [{ 
-                            x, y, time: performance.now(), 
-                            pressure: initialPressure 
-                        }];
-                        this.canvasState.strokePoints = [{ 
-                            x, y, time: performance.now(), 
-                            pressure: initialPressure 
-                        }];
-                        this.startToolAction(x, y);
-                        this.setDirtyCanvas(true);
-                        this._hasMovedSinceDown = false;
-                        if (this._clickReleaseTimeout) clearTimeout(this._clickReleaseTimeout);
-                        this._clickReleaseTimeout = setTimeout(() => {
-                            if (this.canvasState && this.canvasState.isDrawing && !this._hasMovedSinceDown) {
-                                this.onMouseUp(e, pos);
-                            }
-                        }, 50);
-                        break;
-                }
-                return true; 
-            }
-        };
         nodeType.prototype._handleToolbarMouseDown = function(pos) {
             const metrics = this._getScaledToolbarMetrics();
             const toolbarWidth = metrics.toolbarWidth;
-            if (pos[0] < toolbarWidth * 1.2) {
+            const toolbarBounds = {
+                x: 0,
+                y: 0,
+                width: toolbarWidth * 1.2,
+                height: this.size[1]
+            };
+            if (UI_HELPERS.isInBounds(pos[0], pos[1], toolbarBounds)) {
                 return this.handleToolbarClick(pos[0], pos[1]);
             }
             return false; 
         };
         nodeType.prototype._handleQuickControlsMouseDown = function(e, pos) {
             const quickControlsBounds = this.getQuickControlsBarBounds();
-            const isOverQuickControls = (
-                pos[0] >= quickControlsBounds.x &&
-                pos[0] <= quickControlsBounds.x + quickControlsBounds.width &&
-                pos[1] >= quickControlsBounds.y &&
-                pos[1] <= quickControlsBounds.y + quickControlsBounds.height
-            );
+            const isOverQuickControls = UI_HELPERS.isInBounds(pos[0], pos[1], quickControlsBounds);
             if (isOverQuickControls && this.settingsManager && this.settingsManager.handleQuickControlsInteraction) {
                 const localPos = { x: pos[0], y: pos[1], event: e };
                 const result = this.settingsManager.handleQuickControlsInteraction('pointerdown', localPos, this.canvasState);
@@ -1703,6 +2116,9 @@ app.registerExtension({
             if (size[0] < 250) size[0] = 250;
             if (size[1] < 300) size[1] = 300;
             this.size = size;
+            if (this.updateRefreshButtonPosition) {
+                this.updateRefreshButtonPosition();
+            }
             this.setDirtyCanvas(true, true);
         };
         nodeType.prototype.preloadToolIcons = function() {

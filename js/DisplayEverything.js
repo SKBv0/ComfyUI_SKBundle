@@ -9,17 +9,76 @@ app.registerExtension({
         const prototype = nodeType.prototype;
         
         prototype.onNodeCreated = function() {
-            console.log("Node created");
             this.size = [320, 180];
             this.originalText = "";
             this.fonts = ['Arial', 'Verdana', 'Georgia', 'Tahoma', 'Helvetica', 'Open Sans', 'Roboto', 'Lato', 'Merriweather', 'PT Sans'];
             this.selectedFontIndex = 0;
             
+            // Instance-level onMouseDown handler for toolbar interactions
+            this.onMouseDown = function(event) {
+                const localY = event.canvasY - this.pos[1];
+                const localX = event.canvasX - this.pos[0];
+
+                // Allow widget interaction in widget area (below icons)
+                if (localY >= 40) {
+                    // Widget area - allow default behavior for text editing
+                    return false;
+                }
+
+                const iconWidth = 20;
+                const iconSpacing = 4;
+                const rightMargin = 25;
+                let xPosition = this.size[0] - iconWidth - rightMargin;
+
+                const actions = [
+                    () => this.setColor('#000000'),
+                    () => this.setColor('#cccccc'),
+                    () => this.setColor('#ffffff'),
+                    () => this.openFontDialog(),
+                    this.toggleItalic,
+                    this.toggleBold,
+                    this.increaseFontSize,
+                    this.decreaseFontSize,
+                ];
+
+                const iconPositions = actions.map((action, index) => {
+                    const x = xPosition - (index * (iconWidth + iconSpacing));
+                    return {
+                        x: x,
+                        y: 0,
+                        width: iconWidth,
+                        height: 40,
+                        action: actions[index]
+                    };
+                });
+
+                for (const pos of iconPositions) {
+                    if (localX >= pos.x && localX < pos.x + pos.width &&
+                        localY >= pos.y && localY < pos.y + pos.height) {
+                        pos.action.call(this);
+                        this.setDirtyCanvas(true);
+                        return true;
+                    }
+                }
+                return false;
+            }.bind(this);
+            
+            // Instance-level onMouseMove handler for hover in toolbar area
+            this.onMouseMove = function(event) {
+                const localY = event.canvasY - this.pos[1];
+                const localX = event.canvasX - this.pos[0];
+                
+                // Only trigger hover effects in icon area (top 40px)
+                if (localY >= 0 && localY < 40) {
+                    this.setDirtyCanvas(true);
+                }
+            }.bind(this);
+            
             this.createWidget();
         };
 
         prototype.createWidget = function() {
-            const widget = ComfyWidgets.STRING(this, "output", ["STRING", { multiline: true, readonly: true }], app);
+            const widget = ComfyWidgets.STRING(this, "output", ["STRING", { multiline: true, readonly: false }], app);
             this.showValueWidget = widget.widget;
             
             const self = this;
@@ -243,49 +302,6 @@ app.registerExtension({
             document.body.appendChild(dialog);
         };
 
-        prototype.onMouseDown = function(event) {
-            const localY = event.canvasY - this.pos[1];
-            const localX = event.canvasX - this.pos[0];
-
-            if (localY >= 40) return;
-
-            const iconWidth = 20;
-            const iconSpacing = 4;
-            const rightMargin = 25;
-            let xPosition = this.size[0] - iconWidth - rightMargin;
-
-            const actions = [
-                () => this.setColor('#000000'),
-                () => this.setColor('#cccccc'),
-                () => this.setColor('#ffffff'),
-                () => this.openFontDialog(),
-                this.toggleItalic,
-                this.toggleBold,
-                this.increaseFontSize,
-                this.decreaseFontSize,
-                () => this.openBackgroundColorDialog()
-            ];
-
-            const iconPositions = actions.map((_, index) => {
-                const x = xPosition - (index * (iconWidth + iconSpacing));
-                return {
-                    x: x,
-                    y: 0,
-                    width: iconWidth,
-                    height: 40,
-                    action: actions[index]
-                };
-            });
-
-            for (const pos of iconPositions) {
-                if (localX >= pos.x && localX < pos.x + pos.width &&
-                    localY >= pos.y && localY < pos.y + pos.height) {
-                    pos.action.call(this);
-                    this.setDirtyCanvas(true);
-                    break;
-                }
-            }
-        };
 
         prototype.decreaseFontSize = function() {
             const currentSize = parseFloat(this.showValueWidget.inputEl.style.fontSize) || 14;
