@@ -8,6 +8,8 @@ app.registerExtension({
             const EDIT_ICON_MARGIN = 8;
             const EDIT_ICON_DOT_RADIUS = EDIT_ICON_SIZE * 0.1;
             const EDIT_ICON_DOT_SPACING = EDIT_ICON_SIZE * 0.3;
+            const TITLE_MODE_NO_TITLE = 1;
+            const TRANSPARENT_NODE_CHROME = "transparent";
             
             const defaultProperties = {
                 title: "Modern Title",
@@ -71,19 +73,19 @@ app.registerExtension({
                 subtitleFontSize: [18, 24, 30, 36, 42],
                 subtitleFontWeight: ["normal", "bold"],
                 textColor: ["#ffffff", "#000000", "#ff0000", "#00ff00", "#0000ff", "#ffff00", "#00ffff", "#ff00ff"],
-                backgroundColor: ["#000000", "#333333", "#666666", "#999999", "rgba(0,0,0,0)"],
+                backgroundColor: ["#000000", "#333333", "#666666", "#999999"],
                 accentColor: ["#ffffff", "#000000", "#ff0000", "#00ff00", "#0000ff", "#ffff00", "#00ffff", "#ff00ff"],
                 borderRadius: [0, 5, 10, 15, 20],
                 padding: [0, 5, 10, 15, 20, 25, 30],
                 titleSubtitleGap: [0, 5, 10, 15, 20],
                 animation: ["none", "fade", "slide", "bounce", "rotate", "shake"],
                 animationDuration: [500, 1000, 1500, 2000],
-                shadowColor: ["#000000", "#333333", "#666666", "#999999", "rgba(0,0,0,0)"],
+                shadowColor: ["#000000", "#333333", "#666666", "#999999"],
                 shadowBlur: [0, 5, 10, 15, 20],
                 shadowOffsetX: [-10, -5, 0, 5, 10],
                 shadowOffsetY: [-10, -5, 0, 5, 10],
-                gradientStartColor: ["#000000", "#333333", "#666666", "#999999", "rgba(0,0,0,0)"],
-                gradientEndColor: ["#000000", "#333333", "#666666", "#999999", "rgba(0,0,0,0)"],
+                gradientStartColor: ["#000000", "#333333", "#666666", "#999999"],
+                gradientEndColor: ["#000000", "#333333", "#666666", "#999999"],
                 animationType: ["none", "fade", "slide", "bounce", "rotate", "shake"],
                 animationEasing: ["linear", "easeInQuad", "easeOutQuad", "easeInOutQuad", 
                                  "easeInCubic", "easeOutCubic", "easeInOutCubic",
@@ -93,6 +95,26 @@ app.registerExtension({
                 gradientType: ["linear", "radial", "conic"],
                 gradientAngle: [0, 45, 90, 135, 180, 225, 270, 315]
             };
+            const applyTransparentNodeChrome = (node) => {
+                if (!node) return;
+                node.title = "";
+                node.color = TRANSPARENT_NODE_CHROME;
+                node.bgcolor = TRANSPARENT_NODE_CHROME;
+                node.boxcolor = TRANSPARENT_NODE_CHROME;
+                node.flags = {
+                    ...node.flags,
+                    no_title: true
+                };
+                node.onDrawTitleBar = () => {};
+                node.onDrawTitleBox = () => {};
+            };
+
+            nodeType.title_mode = TITLE_MODE_NO_TITLE;
+            nodeType.title_color = TRANSPARENT_NODE_CHROME;
+            nodeType.color = TRANSPARENT_NODE_CHROME;
+            nodeType.bgcolor = TRANSPARENT_NODE_CHROME;
+            nodeType.boxcolor = TRANSPARENT_NODE_CHROME;
+
             nodeType.prototype.onNodeCreated = function() {
                 this.properties = {...defaultProperties};
                 this.outputs = [];
@@ -112,13 +134,14 @@ app.registerExtension({
                 }
                 this.serialize_widgets = true;
                 this.size = this.computeSize();
-                this.color = "#333333";
-                this.bgcolor = "#353535";
                 this.flags = {
+                    ...this.flags,
                     allow_interaction: true,
                     resizable: true,
-                    draggable: true
+                    draggable: true,
+                    no_title: true
                 };
+                applyTransparentNodeChrome(this);
                 // Initialize position properly to avoid null values
                 if (!this.pos) this.pos = [0, 0];
                 this.originalPos = [...this.pos];
@@ -523,6 +546,8 @@ app.registerExtension({
             nodeType.prototype.getTitle = function() {
                 return "";
             };
+            nodeType.prototype.onDrawTitleBar = function() {};
+            nodeType.prototype.onDrawTitleBox = function() {};
             nodeType.prototype.onBounding = function() {
                 return [0, 0, this.size[0], this.size[1]];
             }
@@ -1531,6 +1556,7 @@ app.registerExtension({
                 o.properties.animationLoop = this.properties.animationLoop;
             };
             nodeType.prototype.onConfigure = function(o) {
+                applyTransparentNodeChrome(this);
                 this.properties = {...defaultProperties};
                 if (o.properties) {
                     for (let key in o.properties) {
@@ -1572,6 +1598,7 @@ app.registerExtension({
                     }, 1000);
                 }
                 this.loadFonts();
+                applyTransparentNodeChrome(this);
                 return true;
             };
         }
@@ -1580,23 +1607,23 @@ app.registerExtension({
 const oldDrawNode = LGraphCanvas.prototype.drawNode;
 LGraphCanvas.prototype.drawNode = function(node, ctx) {
     if (node.type === "TitlePlus") {
-        const originalColor = node.color;
-        const originalBgColor = node.bgcolor;
-        node.color = "rgba(0,0,0,0)";
-        node.bgcolor = "rgba(0,0,0,0)";
-        
+        node.color = "transparent";
+        node.bgcolor = "transparent";
+        node.boxcolor = "transparent";
+        node.flags = {
+            ...node.flags,
+            no_title: true
+        };
+
         ctx.save();
         if (node.isAnimating && (node.animationOffsetX || node.animationOffsetY)) {
             ctx.translate(node.animationOffsetX || 0, node.animationOffsetY || 0);
         }
-        
-        const result = oldDrawNode.apply(this, arguments);
-        node.color = originalColor;
-        node.bgcolor = originalBgColor;
+
         if (node.onDrawForeground) {
             node.onDrawForeground(ctx);
         }
-        
+
         ctx.restore();
         if (node.mouseOver) {
             
@@ -1630,7 +1657,7 @@ LGraphCanvas.prototype.drawNode = function(node, ctx) {
             ctx.fill();
             ctx.restore(); 
         }
-        return result;
+        return true;
     }
     return oldDrawNode.apply(this, arguments);
 };

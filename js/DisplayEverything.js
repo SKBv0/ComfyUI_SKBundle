@@ -84,7 +84,7 @@ app.registerExtension({
             const self = this;
             if (this.showValueWidget) {
                 this.showValueWidget.callback = function(value) {
-                    self.onWidgetChanged("output", value);
+                    self.originalText = value ?? "";
                 };
             }
             

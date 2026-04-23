@@ -6,6 +6,77 @@ app.registerExtension({
     name: "SKB.TextBox",
     async beforeRegisterNodeDef(nodeType, nodeData, app) {
         if (nodeType.comfyClass === "TextBox") {
+            const hideInternalWidget = (widget) => {
+                if (!widget) return;
+
+                widget.origType ??= widget.type;
+                widget.type = "hidden";
+                widget.hidden = true;
+                widget.options ??= {};
+                widget.options.hidden = true;
+                widget.options.canvasOnly = true;
+                widget.options.getMinHeight = () => 0;
+                widget.options.getMaxHeight = () => 0;
+
+                if (!widget.origComputeSize && widget.computeSize) {
+                    widget.origComputeSize = widget.computeSize;
+                }
+                widget.computeSize = () => [0, -4];
+
+                if (!widget.origDraw && widget.draw) {
+                    widget.origDraw = widget.draw;
+                }
+                widget.draw = () => {};
+
+                const element = widget.element || widget.inputEl;
+                if (element?.style) {
+                    element.hidden = true;
+                    element.style.display = "none";
+                    element.style.pointerEvents = "none";
+                }
+            };
+
+            const hideAllInternalWidgets = (node) => {
+                if (!node?.widgets) return;
+                for (const widget of node.widgets) {
+                    hideInternalWidget(widget);
+                }
+                node.widgets_height = 0;
+            };
+
+            const quoteFontFamily = (fontFamily) => {
+                const fallback = "Arial";
+                const family = String(fontFamily || fallback).trim() || fallback;
+                return family.split(",")
+                    .map(part => {
+                        const name = part.trim().replace(/^['"]|['"]$/g, "");
+                        if (!name) return "";
+                        if (/^(serif|sans-serif|monospace|cursive|fantasy|system-ui|-apple-system|BlinkMacSystemFont)$/i.test(name)) {
+                            return name;
+                        }
+                        return `"${name.replace(/"/g, '\\"')}"`;
+                    })
+                    .filter(Boolean)
+                    .join(", ");
+            };
+
+            const getTextFont = (node) => {
+                const italic = node.uiState?.italic ? "italic" : "normal";
+                const weight = node.uiState?.bold ? "bold" : "normal";
+                const size = node.uiState?.fontSize || 32;
+                const family = quoteFontFamily(node.uiState?.fontFamily);
+                return `${italic} ${weight} ${size}px ${family}, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif`;
+            };
+
+            const ensureTextFontLoaded = (node) => {
+                if (!document.fonts?.load) {
+                    return Promise.resolve();
+                }
+                const font = getTextFont(node);
+                return document.fonts.load(font)
+                    .then(() => document.fonts.ready)
+                    .catch(() => undefined);
+            };
 
             if (!document.getElementById('skb-textbox-styles')) {
                 const style = document.createElement('style');
@@ -25,39 +96,12 @@ app.registerExtension({
                     const widget = ComfyWidgets[type](this, name, [type, options], app);
                     this.widgets_by_name[name] = widget.widget;
 
-                    
-                    if (widget.widget) {
-                        widget.widget.origType = widget.widget.type;
-                        widget.widget.type = "hidden";
-                        widget.widget.origComputeSize = widget.widget.computeSize;
-                        widget.widget.computeSize = () => [0, -4];
-                        const origDraw = widget.widget.draw;
-                        widget.widget.draw = function(ctx, node, width, y) {
-                            
-                            this.type = this.origType;
-                            const size = this.origComputeSize ? this.origComputeSize() : [0, 0];
-                            this.type = "hidden";
-                            return size;
-                        };
-                    }
+                    hideInternalWidget(widget.widget);
                 }
 
-                if (this.widgets) {
-                    for (const widget of this.widgets) {
-                        widget.origType = widget.type;
-                        widget.type = "hidden";
-                        widget.origComputeSize = widget.computeSize;
-                        widget.computeSize = () => [0, -4];
-                        const origDraw = widget.draw;
-                        widget.draw = function(ctx, node, width, y) {
-                            
-                            this.type = this.origType;
-                            const size = this.origComputeSize ? this.origComputeSize() : [0, 0];
-                            this.type = "hidden";
-                            return size;
-                        };
-                    }
-                }
+                hideAllInternalWidgets(this);
+                requestAnimationFrame?.(() => hideAllInternalWidgets(this));
+                setTimeout(() => hideAllInternalWidgets(this), 0);
 
                 this.widgets_height = 0;
 
@@ -329,8 +373,9 @@ app.registerExtension({
                     this.tools = JSON.parse(JSON.stringify(TOOLBAR_TOOLS));
 
                     const handleGlobalMouseUp = () => {
-                        if (this.isDragging) {
-                            this.isDragging = false;
+                        if (this.uiState?.isDragging) {
+                            this.uiState.isDragging = false;
+                            this.uiState.dragStart = null;
                             this.widgets_by_name.position_x.value = Math.round(this.uiState.position.x);
                             this.widgets_by_name.position_y.value = Math.round(this.uiState.position.y);
                             this.serialize_widgets();
@@ -339,10 +384,12 @@ app.registerExtension({
                     };
 
                     document.addEventListener('mouseup', handleGlobalMouseUp);
+                    window.addEventListener('blur', handleGlobalMouseUp);
 
                     const oldOnRemoved = this.onRemoved;
                     this.onRemoved = () => {
                         document.removeEventListener('mouseup', handleGlobalMouseUp);
+                        window.removeEventListener('blur', handleGlobalMouseUp);
                         if (oldOnRemoved) oldOnRemoved.call(this);
                     };
 
@@ -391,7 +438,7 @@ app.registerExtension({
                                 currentX += buttonSize + buttonSpacing;
                             }
 
-                            return true; // Prevent dragging in toolbar area
+                            return false;
                         }
 
                         const canvasX = 10;
@@ -399,13 +446,21 @@ app.registerExtension({
                         const canvasWidth = this.size[0] - 20;
                         const canvasHeight = this.size[1] - toolbarHeight - 20;
 
-                        if (x >= canvasX && x <= canvasX + canvasWidth &&
-                            y >= canvasY && y <= canvasY + canvasHeight) {
+                        const textBounds = this.getTextPreviewBounds?.();
+                        if (textBounds &&
+                            x >= textBounds.x && x <= textBounds.x + textBounds.width &&
+                            y >= textBounds.y && y <= textBounds.y + textBounds.height) {
                             this.uiState.isSelected = true;
                             this.uiState.isDragging = true;
                             this.uiState.dragStart = { x, y };
                             this.setDirtyCanvas(true);
                             return true;
+                        }
+
+                        if (x >= canvasX && x <= canvasX + canvasWidth &&
+                            y >= canvasY && y <= canvasY + canvasHeight) {
+                            this.uiState.isSelected = false;
+                            this.setDirtyCanvas(true);
                         }
 
                         return false;
@@ -542,12 +597,7 @@ app.registerExtension({
 
                                 ctx.translate(offsetX, offsetY);
 
-                                let fontStyle = "";
-                                if (this.uiState.bold) fontStyle += "bold ";
-                                if (this.uiState.italic) fontStyle += "italic ";
-
-                                const fontFamily = this.uiState.fontFamily || "Montserrat";
-                                ctx.font = `${fontStyle}${this.uiState.fontSize}px "${fontFamily}", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif`;
+                                ctx.font = getTextFont(this);
                                 ctx.fillStyle = this.uiState.textColor;
 
                                 const lines = text.split('\\n');
@@ -824,6 +874,47 @@ app.registerExtension({
                             x += buttonSize + buttonSpacing;
                         }
                     }
+                },
+
+                getTextPreviewBounds() {
+                    if (!this.uiState || !this.size) return null;
+
+                    const toolbarHeight = 30;
+                    const canvasX = 10;
+                    const canvasY = toolbarHeight + 10;
+                    const canvasWidth = this.size[0] - 20;
+                    const canvasHeight = this.size[1] - toolbarHeight - 20;
+                    if (canvasWidth <= 0 || canvasHeight <= 0) return null;
+
+                    const realWidth = this.widgets_by_name?.width?.value || 512;
+                    const realHeight = this.widgets_by_name?.height?.value || 512;
+                    const scale = Math.min(canvasWidth / realWidth, canvasHeight / realHeight);
+                    const scaledWidth = realWidth * scale;
+                    const scaledHeight = realHeight * scale;
+                    const offsetX = canvasX + (canvasWidth - scaledWidth) / 2;
+                    const offsetY = canvasY + (canvasHeight - scaledHeight) / 2;
+
+                    const measureCanvas = document.createElement("canvas");
+                    const measureCtx = measureCanvas.getContext("2d");
+                    if (!measureCtx) return null;
+
+                    measureCtx.font = getTextFont(this);
+                    const text = this.widgets_by_name?.text?.value || this.uiState.text || "Enter Text";
+                    const lines = String(text).split("\n");
+                    const lineHeight = (this.uiState.fontSize || 32) + 4;
+                    const textWidth = Math.max(...lines.map(line => measureCtx.measureText(line).width), 32);
+                    const textHeight = Math.max(lines.length * lineHeight, lineHeight);
+
+                    const centerX = offsetX + ((this.uiState.position?.x || 0) / realWidth) * scaledWidth;
+                    const centerY = offsetY + ((this.uiState.position?.y || 0) / realHeight) * scaledHeight;
+                    const padding = 14;
+
+                    return {
+                        x: centerX - (textWidth * scale) / 2 - padding,
+                        y: centerY - (textHeight * scale) / 2 - padding,
+                        width: textWidth * scale + padding * 2,
+                        height: textHeight * scale + padding * 2
+                    };
                 },
 
 
@@ -1327,7 +1418,7 @@ app.registerExtension({
                             cursor: pointer;
                             border-radius: 4px;
                             margin-bottom: 4px;
-                            font-family: ${font};
+                            font-family: ${quoteFontFamily(font)};
                             color: #fff;
                             font-size: 16px;
                             background: ${this.uiState.fontFamily === font ? '#4a9eff' : '#2a2a2a'};
@@ -1338,7 +1429,7 @@ app.registerExtension({
                         ">
                             <span style="flex: 1;">${font}</span>
                             <span style="
-                                font-family: ${font};
+                                font-family: ${quoteFontFamily(font)};
                                 margin-left: 10px;
                                 color: #aaa;
                                 font-size: 20px;
@@ -1408,13 +1499,12 @@ app.registerExtension({
                             this.widgets_by_name.is_bold.value = currentBold;
                             this.widgets_by_name.is_italic.value = currentItalic;
                             
-                            
-                            this.serialize_widgets();
-                            if (this.onExecuted) {
-                                app.graph.runStep(this);
-                            }
-                            
                             this.setDirtyCanvas(true);
+                            this.serialize_widgets();
+                            ensureTextFontLoaded(this).then(() => {
+                                this.serialize_widgets();
+                                this.setDirtyCanvas(true, true);
+                            });
                             document.body.removeChild(dialog);
                         };
                     });
@@ -1663,10 +1753,7 @@ app.registerExtension({
                     ctx.fillRect(0, 0, width, height);
                         }
 
-                        let fontStyle = "";
-                        if (this.uiState.bold) fontStyle += "bold ";
-                        if (this.uiState.italic) fontStyle += "italic ";
-                        ctx.font = `${fontStyle}${this.uiState.fontSize}px ${this.uiState.fontFamily}`;
+                        ctx.font = getTextFont(this);
                         
                         const text = this.uiState.text;
                         const lines = text.split('\n');

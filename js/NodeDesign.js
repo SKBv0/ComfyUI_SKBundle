@@ -1,4 +1,14 @@
 import { SVG, STYLES } from './NodeDesignConstants.js';
+
+function normalizeColorForInput(color, fallback = '#000000') {
+    if (typeof color !== 'string') return fallback;
+    if (/^#[0-9a-fA-F]{6}$/.test(color)) return color;
+    if (/^#[0-9a-fA-F]{3}$/.test(color)) {
+        return `#${color[1]}${color[1]}${color[2]}${color[2]}${color[3]}${color[3]}`;
+    }
+    return fallback;
+}
+
 const ButtonManager = {
     isInitialized: false,
     buttonContainer: null,
@@ -306,13 +316,13 @@ const ButtonManager = {
         this.isUpdatingPickers = true;
         try {
             if (this.colorPicker) {
-                const currentColor = firstNode.color || '#ffffff';
+                const currentColor = normalizeColorForInput(firstNode.color, '#ffffff');
                 if (this.colorPicker.value !== currentColor) {
                     this.colorPicker.value = currentColor;
                 }
             }
             if (this.bgColorPicker) {
-                const currentBgColor = firstNode.bgcolor || '#333333';
+                const currentBgColor = normalizeColorForInput(firstNode.bgcolor, '#333333');
                 if (this.bgColorPicker.value !== currentBgColor) {
                     this.bgColorPicker.value = currentBgColor;
                 }
@@ -790,7 +800,35 @@ const ButtonManager = {
         const selectedNodes = this.getSelectedNodes();
         if (selectedNodes.length > 0) {
             selectedNodes.forEach(node => {
-                node[property] = color;
+                const oldColor = node.color;
+                const oldBgColor = node.bgcolor;
+                const nextColor = property === 'color' ? color : node.color;
+                const nextBgColor = property === 'bgcolor' ? color : node.bgcolor;
+
+                if (typeof node.setColorOption === 'function') {
+                    node.setColorOption({
+                        color: nextColor,
+                        bgcolor: nextBgColor
+                    });
+                } else {
+                    node[property] = color;
+                }
+
+                // Newer ComfyUI frontend mirrors node color into Vue node data through this event.
+                if (node.graph?.trigger) {
+                    node.graph.trigger('node:property:changed', {
+                        nodeId: node.id,
+                        property: 'color',
+                        oldValue: oldColor,
+                        newValue: node.color
+                    });
+                    node.graph.trigger('node:property:changed', {
+                        nodeId: node.id,
+                        property: 'bgcolor',
+                        oldValue: oldBgColor,
+                        newValue: node.bgcolor
+                    });
+                }
             });
             if (LGraphCanvas.active_canvas) {
                 LGraphCanvas.active_canvas.setDirty(true, true);

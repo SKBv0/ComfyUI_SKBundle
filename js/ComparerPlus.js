@@ -49,6 +49,11 @@ function drawGradientBox(ctx, x, y, width, height, isHovered = false) {
     ctx.stroke();
 }
 
+function isInNodeResizeCorner(x, y, node) {
+    const handleSize = 24;
+    return x >= node.size[0] - handleSize && y >= node.size[1] - handleSize;
+}
+
 app.registerExtension({
     name: "SKB.ImageComparer",
     async beforeRegisterNodeDef(nodeType, nodeData, app) {
@@ -67,7 +72,10 @@ app.registerExtension({
             nodeType.prototype.onNodeCreated = function() {
                 this.serialize_widgets = true;
                 this.isPointerDown = false;
+                this.isDividerDragging = false;
+                this.isOpacitySliderDragging = false;
                 this.isPointerOver = false;
+                this._skbComparerCursorActive = false;
                 this.imgs = [];
                 this.properties = this.properties || {}; 
                 this.properties.compare_mode = this.properties.compare_mode || COMPARE_MODES.SLIDE;
@@ -90,6 +98,13 @@ app.registerExtension({
                 // Instance-level onMouseDown to handle toolbar and grid controls
                 this.onMouseDown = function(event) {
                     const [x, y] = this.getLocalMousePos(event);
+                    this.isPointerDown = false;
+                    this.isDividerDragging = false;
+                    this.isOpacitySliderDragging = false;
+
+                    if (isInNodeResizeCorner(x, y, this)) {
+                        return false;
+                    }
                     
                     if (this.properties.compare_mode === COMPARE_MODES.GRID) {
                         if (this.gridMinusButton &&
@@ -130,16 +145,9 @@ app.registerExtension({
                         return true;
                     }
 
-                    this.isPointerDown = true;
-                    this.lastPointerPos = [x, y];
-
                     // Check for opacity slider specifically in fade mode
                     if (this.properties.compare_mode === COMPARE_MODES.FADE &&
-                        this.opacitySliderArea &&
-                        x >= this.opacitySliderArea.x &&
-                        x <= this.opacitySliderArea.x + this.opacitySliderArea.width &&
-                        y >= this.opacitySliderArea.y &&
-                        y <= this.opacitySliderArea.y + this.opacitySliderArea.height) {
+                        isInBounds(x, y, this.opacitySliderArea)) {
                         
                         this.isOpacitySliderDragging = true;
                         const relativeY = (y - this.opacitySliderArea.y) / this.opacitySliderArea.height;
@@ -148,14 +156,16 @@ app.registerExtension({
                         return true;
                     }
 
-                    // Only do slider/comparison interaction if not clicking on buttons
-                    if (this.imgs && this.imgs.length > 0) {
-                        if (this.properties.compare_mode === COMPARE_MODES.SLIDE) {
-                            this.properties.dividerPosition = x / this.size[0];
-                            this.properties.dividerPosition = Math.max(0, Math.min(1, this.properties.dividerPosition));
-                            this.setDirtyCanvas(true);
-                            return true;
-                        }
+                    if (this.imgs?.length > 1 &&
+                        this.properties.compare_mode === COMPARE_MODES.SLIDE &&
+                        isInBounds(x, y, this.getPrimaryImageArea())) {
+                        
+                        this.isPointerDown = true;
+                        this.isDividerDragging = true;
+                        this.properties.dividerPosition = x / this.size[0];
+                        this.properties.dividerPosition = Math.max(0, Math.min(1, this.properties.dividerPosition));
+                        this.setDirtyCanvas(true);
+                        return true;
                     }
 
                     return false;
@@ -268,6 +278,8 @@ app.registerExtension({
                 ctx.beginPath();
                 ctx.rect(0, 0, dividerX, height);
                 ctx.clip();
+                ctx.fillStyle = "#333";
+                ctx.fillRect(0, 0, width, height);
                 
                 const img2 = this.imgs[1];
                 this.drawImageFitted(ctx, img2, 0, 0, width, height, img1Ratio);
@@ -278,23 +290,46 @@ app.registerExtension({
                 ctx.restore();
             };
 
-            nodeType.prototype.drawImageFitted = function(ctx, img, x, y, width, height, forceAspectRatio = null) {
-                const imgRatio = forceAspectRatio || (img.width / img.height);
+            nodeType.prototype.getFittedRect = function(aspectRatio, x, y, width, height) {
                 const targetRatio = width / height;
                 
                 let drawWidth, drawHeight;
                 
-                if (imgRatio > targetRatio) {
+                if (aspectRatio > targetRatio) {
                     drawWidth = width;
-                    drawHeight = width / imgRatio;
+                    drawHeight = width / aspectRatio;
                     const yOffset = (height - drawHeight) / 2;
-                    ctx.drawImage(img, x, y + yOffset, drawWidth, drawHeight);
+                    return { x: x, y: y + yOffset, width: drawWidth, height: drawHeight };
                 } else {
                     drawHeight = height;
-                    drawWidth = height * imgRatio;
+                    drawWidth = height * aspectRatio;
                     const xOffset = (width - drawWidth) / 2;
-                    ctx.drawImage(img, x + xOffset, y, drawWidth, drawHeight);
+                    return { x: x + xOffset, y: y, width: drawWidth, height: drawHeight };
                 }
+            };
+
+            nodeType.prototype.drawImageFitted = function(ctx, img, x, y, width, height, frameAspectRatio = null) {
+                const frame = frameAspectRatio
+                    ? this.getFittedRect(frameAspectRatio, x, y, width, height)
+                    : { x, y, width, height };
+                const imageRect = this.getFittedRect(
+                    img.width / img.height,
+                    frame.x,
+                    frame.y,
+                    frame.width,
+                    frame.height
+                );
+                
+                ctx.drawImage(img, imageRect.x, imageRect.y, imageRect.width, imageRect.height);
+            };
+
+            nodeType.prototype.getPrimaryImageArea = function() {
+                const img = this.imgs?.[0];
+                if (!img?.complete || !img.width || !img.height) {
+                    return { x: 0, y: 0, width: this.size[0], height: this.size[1] };
+                }
+
+                return this.getFittedRect(img.width / img.height, 0, 0, this.size[0], this.size[1]);
             };
 
             nodeType.prototype.drawFadeMode = function(ctx, width, height) {
@@ -616,7 +651,7 @@ app.registerExtension({
             };
 
             nodeType.prototype.updateCursor = function(x, y) {
-                let cursor = 'default';
+                let cursor = null;
                 
                 if (this.properties.compare_mode === COMPARE_MODES.FADE && 
                     isInBounds(x, y, this.opacitySliderArea)) {
@@ -629,8 +664,12 @@ app.registerExtension({
                     cursor = 'ew-resize';
                 }
                 
-                if (document.body.style.cursor !== cursor) {
+                if (cursor) {
                     document.body.style.cursor = cursor;
+                    this._skbComparerCursorActive = true;
+                } else if (this._skbComparerCursorActive) {
+                    document.body.style.cursor = '';
+                    this._skbComparerCursorActive = false;
                 }
             };
 
@@ -647,7 +686,7 @@ app.registerExtension({
                         return true;
                     }
 
-                    if (this.isPointerDown) {
+                    if (this.isDividerDragging) {
                         this.properties.dividerPosition = Math.max(0, Math.min(1, x / this.size[0]));
                         this.setDirtyCanvas(true);
                         return true;
@@ -664,8 +703,12 @@ app.registerExtension({
 
             nodeType.prototype.onMouseUp = function(event) {
                 this.isPointerDown = false;
+                this.isDividerDragging = false;
                 this.isOpacitySliderDragging = false;
-                document.body.style.cursor = 'default';
+                if (this._skbComparerCursorActive) {
+                    document.body.style.cursor = '';
+                    this._skbComparerCursorActive = false;
+                }
                 return false;
             };
 
@@ -759,8 +802,12 @@ app.registerExtension({
             nodeType.prototype.onMouseLeave = function(event) {
                 this.isPointerOver = false;
                 this.isPointerDown = false;
+                this.isDividerDragging = false;
                 this.isOpacitySliderDragging = false;
-                document.body.style.cursor = 'default';
+                if (this._skbComparerCursorActive) {
+                    document.body.style.cursor = '';
+                    this._skbComparerCursorActive = false;
+                }
             };
 
         }

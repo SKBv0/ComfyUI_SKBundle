@@ -542,6 +542,11 @@ app.registerExtension({
             this.addWidget("slider", "Opacity", this.canvasState.opacity, (v) => {
                             this.canvasState.opacity = v;
             }, { min: 0, max: 1, step: 0.01 });
+            this.livePreviewCanvas = document.createElement('canvas');
+            this.livePreviewCtx = this.livePreviewCanvas.getContext('2d', {
+                willReadFrequently: false,
+                alpha: true
+            });
             this._resizeCanvases(512, 512); 
             this.originalImageCanvas = document.createElement('canvas');
             this.originalImageCtx = this.originalImageCanvas.getContext('2d');
@@ -555,11 +560,6 @@ app.registerExtension({
                 }
             }, PERFORMANCE_CONFIG.CLEANUP_INTERVAL);
             this._tooltipToDraw = null;
-            this.livePreviewCanvas = document.createElement('canvas');
-            this.livePreviewCtx = this.livePreviewCanvas.getContext('2d', {
-                willReadFrequently: false, 
-                alpha: true
-            });
             this.isDrawingContinuousStroke = false;
             
             // Initialize refresh button bounds
@@ -594,11 +594,8 @@ app.registerExtension({
             
             // Backup call in case the first one doesn't work
             setTimeout(function() {
-                console.log('Backup loadInputImage call...');
                 if (self.loadInputImage) {
                     self.loadInputImage();
-                } else {
-                    console.log('loadInputImage function not found in backup!');
                 }
             }, 1000);
             
@@ -608,22 +605,17 @@ app.registerExtension({
         };
         
         nodeType.prototype.loadInputImage = function() {
-            console.log('Loading input image...');
             const inputLink = this.getInputLink(0);
-            console.log('Input link:', inputLink);
             
             if (inputLink) {
                 const inputNode = this.graph.getNodeById(inputLink.origin_id);
-                console.log('Input node:', inputNode);
                 
                 if (inputNode) {
                     if (inputNode.imgs && inputNode.imgs.length > 0) {
-                        console.log('Using inputNode.imgs[0]');
                         this.currentImage = inputNode.imgs[0];
                         this._resizeCanvases(this.currentImage.naturalWidth, this.currentImage.naturalHeight);
                         this.setDirtyCanvas(true, true);
                     } else if (inputNode.imageData) {
-                        console.log('Using inputNode.imageData');
                         const img = new Image();
                         img.onload = () => {
                             this.currentImage = img;
@@ -632,14 +624,10 @@ app.registerExtension({
                         };
                         img.src = inputNode.imageData;
                     } else {
-                        console.log('No input image data found, retrying in 500ms...');
                         setTimeout(() => this.loadInputImage(), 500);
                     }
-                } else {
-                    console.log('Input node not found');
                 }
             } else {
-                console.log('No input link, using fallback image');
                 this.currentImage = this.createFallbackImage(512, 512);
             }
         };
